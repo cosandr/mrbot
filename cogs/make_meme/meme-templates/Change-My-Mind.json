@@ -1,0 +1,15 @@
+{
+    "name": "Change My Mind",
+    "file": "Change-My-Mind.jpg",
+    "boxes": [
+        {
+            "start": [204, 208],
+            "size": [218, 90],
+            "angle": 5.76,
+            "fill": "white",
+            "font-size": 22,
+            "stroke-width": 2,
+            "stroke-fill": "black"
+        }
+    ]
+}

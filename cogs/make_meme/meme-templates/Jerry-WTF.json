@@ -1,0 +1,15 @@
+{
+    "name": "Jerry",
+    "file": "Jerry-WTF.jpg",
+    "boxes": [
+        {
+            "start": [0, 388],
+            "size": [-1, 210],
+            "text-align": [0, -1],
+            "fill": "white",
+            "font-size": 36,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        }
+    ]
+}

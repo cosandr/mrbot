@@ -1,0 +1,427 @@
+import os
+from datetime import datetime
+from typing import Union, Tuple, List, Optional, Dict
+
+import asyncpg
+import discord
+from discord.ext import commands
+from jellyfish import jaro_winkler_similarity
+
+from mrbot import MrBot
+from ext.utils import re_id, find_closest_match
+from .guild import Guild
+
+# Tolerance for online/offline times, in seconds
+time_tolerance = 30
+instance_check = commands.Bot
+if os.getenv('IS_TEST', False):
+    from test.mock_bot import TestBot
+
+    instance_check = (commands.Bot, TestBot)
+
+
+class User:
+    psql_table_name = 'users'
+    psql_table_name_nicks = 'user_nicks'
+    psql_table_name_activity_log = 'user_activity_log'
+    psql_table = f"""
+        CREATE TABLE IF NOT EXISTS {psql_table_name} (
+            id            BIGINT NOT NULL UNIQUE,
+            name          VARCHAR(32) NOT NULL,
+            discriminator SMALLINT,
+            avatar        VARCHAR(34),
+            online        TIMESTAMP,
+            offline       TIMESTAMP,
+            activity      TEXT,
+            mobile        BOOLEAN NOT NULL DEFAULT false
+        );
+        CREATE TABLE IF NOT EXISTS {psql_table_name_nicks} (
+            user_id  BIGINT NOT NULL REFERENCES {psql_table_name} (id),
+            guild_id BIGINT NOT NULL REFERENCES {Guild.psql_table_name} (id),
+            nick     VARCHAR(32),
+            UNIQUE (user_id, guild_id)
+        );
+        CREATE TABLE IF NOT EXISTS {psql_table_name_activity_log} (
+            user_id  BIGINT NOT NULL REFERENCES {psql_table_name} (id) ON DELETE CASCADE,
+            activity TEXT NOT NULL,
+            updated  TIMESTAMP NOT NULL
+        );
+        CREATE OR REPLACE FUNCTION update_{psql_table_name_activity_log}()
+            RETURNS TRIGGER AS $$
+        BEGIN
+            INSERT INTO {psql_table_name_activity_log} (user_id, activity, updated) VALUES (OLD.id, OLD.activity, NOW());
+        RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        DROP TRIGGER IF EXISTS trigger_update_{psql_table_name_activity_log} ON {psql_table_name};
+        CREATE TRIGGER trigger_update_{psql_table_name_activity_log} BEFORE UPDATE ON {psql_table_name}
+            FOR EACH ROW WHEN (NEW.activity IS NOT NULL AND OLD.activity != NEW.activity)
+            EXECUTE PROCEDURE update_{psql_table_name_activity_log}();
+    """
+    psql_all_tables = Guild.psql_all_tables.copy()
+    psql_all_tables.update({(psql_table_name, psql_table_name_nicks, psql_table_name_activity_log): psql_table})
+
+    def __init__(self, id_: int, name: str = None, discriminator: int = None, avatar: str = None,
+                 online: datetime = None, offline: datetime = None, activity: str = None, mobile=False,
+                 all_nicks: dict = None):
+        self.id: int = id_
+        self.name: str = name
+        self.discriminator: int = discriminator
+        self.all_nicks: Dict[int, str] = {}
+        if isinstance(all_nicks, dict):
+            self.all_nicks = {k: v for k, v in all_nicks.items() if isinstance(v, str)}
+        self.avatar: str = avatar
+        self.online: datetime = online
+        self.offline: datetime = offline
+        self.activity: str = activity
+        self.mobile: bool = mobile
+
+    def __eq__(self, other):
+        """Does not check all_nicks
+        Online/offline have a tolerance setting
+        Similar activities are considered equal"""
+        if not isinstance(other, User):
+            return False
+        # Check times
+        times_ok = True
+        # Accept all being None
+        for chk in (self.online, self.offline, other.online, other.offline):
+            if chk is not None:
+                times_ok = False
+                break
+        if not times_ok:
+            # Remains false if one of them is None, same for offline times
+            if isinstance(self.online, datetime) and isinstance(other.online, datetime):
+                time_diff = self.online - other.online
+                if abs(time_diff.total_seconds()) <= time_tolerance:
+                    times_ok = True
+            if isinstance(self.offline, datetime) and isinstance(other.offline, datetime):
+                time_diff = self.offline - other.offline
+                if abs(time_diff.total_seconds()) <= time_tolerance:
+                    times_ok = True
+        activity_ok = True
+        # Compare activities and consider them equal if they are very similar
+        if isinstance(self.activity, str) and isinstance(other.activity, str):
+            activity_ok = jaro_winkler_similarity(self.activity, other.activity) > 0.9
+        elif self.activity != other.activity:
+            activity_ok = False
+        return (self.id == other.id and
+                self.name == other.name and
+                self.discriminator == other.discriminator and
+                self.avatar == other.avatar and
+                self.mobile == other.mobile and
+                times_ok is True and
+                activity_ok is True)
+
+    def __str__(self):
+        if self.name:
+            return self.name
+        return ''
+
+    def __repr__(self):
+        name = 'UNKNOWN'
+        status = ''
+        if self.name:
+            name = self.name
+            if self.discriminator:
+                name += f'#{self.discriminator}'
+            if self.all_nicks_str:
+                name += f' ({self.all_nicks_str})'
+        elif self.all_nicks_str:
+            name = self.all_nicks_str
+        if self.online:
+            status += f'Online at {self.online}\n'
+        if self.offline:
+            status += f'Offline at {self.offline}\n'
+        if self.activity:
+            status += f'Activity: {self.activity}\n'
+        if status:
+            return f'{name} [{self.id}], mobile? {self.mobile}\n{status}'
+        return f'{name} [{self.id}], mobile? {self.mobile}'
+
+    def get_nick(self, guild_id: int):
+        """Returns first nick, or empty string if it doesn't exist"""
+        return self.all_nicks.get(guild_id, '')
+
+    @property
+    def nick(self):
+        if self.all_nicks:
+            return next(iter(self.all_nicks.values()))
+        return ''
+
+    @property
+    def all_nicks_str(self):
+        if self.all_nicks:
+            return ', '.join(self.all_nicks.values())
+        return ''
+
+    @property
+    def discriminator(self):
+        return self._discriminator
+
+    @discriminator.setter
+    def discriminator(self, value: int):
+        try:
+            self._discriminator = int(value)
+        except (TypeError, ValueError):
+            self._discriminator = None
+
+    @property
+    def avatar_url(self):
+        if not self.avatar:
+            if not self.discriminator:
+                return None
+            return f'https://cdn.discordapp.com/embed/avatars/{self.discriminator % 5}.png?size=256'
+        img_fmt = 'png'
+        if self.avatar.startswith('a_'):
+            img_fmt = 'gif'
+        return f'https://cdn.discordapp.com/avatars/{self.id}/{self.avatar}.{img_fmt}?size=512'
+
+    @property
+    def display_name(self):
+        """Returns nickname if one is set, otherwise username. Empty string if neither"""
+        if self.nick:
+            return self.nick
+        if self.name:
+            return self.name
+        return ''
+
+    def to_psql(self) -> Tuple[str, list]:
+        """Returns a query in the form (id, name, ...) VALUES ($1,$2, ...) and its arguments"""
+        q = (f'INSERT INTO {self.psql_table_name} '
+             '(id, name, discriminator, avatar, online, offline, activity, mobile) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) '
+             'ON CONFLICT (id) DO UPDATE SET name=$2, discriminator=$3, avatar=$4, mobile=$8')
+        # Only update online/offline if we have them
+        if self.online:
+            q += ', online=$5'
+        if self.offline:
+            q += ', offline=$6'
+        if self.activity:
+            q += ', activity=$7'
+        q_args = [self.id, self.name, self.discriminator, self.avatar, self.online, self.offline, self.activity, self.mobile]
+        return q, q_args
+
+    def to_psql_nick(self, guild_id: int) -> Tuple[str, list]:
+        """Returns query to update nickname in guild_id, must be present in User.all_nicks"""
+        nick_in_guild = self.all_nicks.get(guild_id, None)
+        q = (f'INSERT INTO {self.psql_table_name_nicks} '
+             '(user_id, guild_id, nick) VALUES ($1, $2, $3) '
+             'ON CONFLICT (user_id, guild_id) DO UPDATE SET nick=$3')
+        q_args = [self.id, guild_id, nick_in_guild]
+        return q, q_args
+
+    async def to_discord(self, ctx: Union[MrBot, commands.Context], guild_id: int = None) -> Optional[Union[discord.Member, discord.User]]:
+        bot, guild, _ = self._split_ctx(ctx, guild_id)
+        # Check guild, return Member
+        if guild:
+            member: discord.Member = guild.get_member(self.id)
+            if member:
+                return member
+        # Check all bot users, return User
+        user: discord.User = bot.get_user(self.id)
+        if user:
+            return user
+        # Fetch from API
+        try:
+            return await bot.fetch_user(self.id)
+        except discord.errors.NotFound:
+            return None
+
+    # noinspection PyTypeChecker
+    @staticmethod
+    def _split_ctx(ctx: Union[MrBot, commands.Context], guild_id: int = None) -> Tuple[MrBot, discord.Guild, int]:
+        """Split Context into bot and guild, try to get guild if Bot and guild_id are given."""
+        if isinstance(ctx, instance_check):
+            bot: MrBot = ctx
+            if not guild_id:
+                guild = None
+            else:
+                guild: discord.Guild = bot.get_guild(guild_id)
+        elif isinstance(ctx, commands.Context):
+            bot: MrBot = ctx.bot
+            guild: discord.Guild = ctx.guild
+            guild_id = ctx.guild.id
+        else:
+            raise TypeError(f'Unknown type {type(ctx)}, need Bot or Context')
+        return bot, guild, guild_id
+
+    @staticmethod
+    def make_psql_query(with_nick=False, with_all_nicks=False, where: str = ''):
+        """Return a query to get a user from PSQL
+
+        :param with_nick: Get nick only for this guild, it will be added as first query argument
+        :param with_all_nicks: Get all nicknames, overridden by with_nick
+        :param where: Add WHERE condition"""
+        select_args = 'u.id, u.name, u.discriminator, u.avatar, u.online, u.offline, u.activity, u.mobile'
+        from_args = f'FROM {User.psql_table_name} u'
+        if with_nick:
+            select_args += ', n.nick AS nick, n.guild_id AS nick_guild_id'
+            from_args += f' LEFT JOIN {User.psql_table_name_nicks} n ON (u.id = n.user_id AND n.guild_id = $1)'
+        elif with_all_nicks:
+            # For each user, return an array containing the nickname and its associated guild
+            # The first index is the nick and the second is the guild_id as a string!
+            # Returns [None, None] if they don't exist
+            select_args += ", array_agg(array[n.nick::text, n.guild_id::text]) AS all_nicks"
+            from_args += f' LEFT JOIN {User.psql_table_name_nicks} n ON (u.id = n.user_id)'
+        q = f'SELECT {select_args} {from_args}'
+        if where:
+            q += f' WHERE {where}'
+        if with_nick:
+            return q
+        if with_all_nicks:
+            q += ' GROUP BY u.id, u.name, u.discriminator, u.avatar, u.online, u.offline, u.activity, u.mobile'
+        return q
+
+    @classmethod
+    def from_search_discord_users(cls, search_name: str, users: List[Union[discord.User, discord.Member]]):
+        """Returns the closest match in a list of discord Users"""
+        similarities = {}
+        for i in range(len(users)):
+            user = users[i]
+            names = [user.name]
+            if isinstance(user, discord.Member):
+                if user.nick:
+                    names.append(user.nick)
+                for r in user.roles:
+                    if len(r.members) == 1:
+                        names.append(r.name)
+            _, sim = find_closest_match(search_name, names)
+            if sim:
+                similarities[i] = sim
+        if similarities:
+            closest_idx = max(similarities, key=similarities.get)
+            return cls.from_discord(users[closest_idx])
+        return None
+
+    @classmethod
+    async def from_search(cls, ctx: Union[MrBot, commands.Context], search: Union[int, str], guild_id: int = None, **kwargs):
+        """Look for user with a name/nickname similar to search, if search is ID look for that instead"""
+        search_id: int = 0
+        search_user: str = ''
+        if isinstance(search, (int, str, float)):
+            search = str(search)
+            m = re_id.search(search)
+            if m:
+                search_id = int(m.group())
+            else:
+                search_user = search
+        # We have an ID, fetch directly
+        if search_id:
+            return await cls.from_id(ctx, user_id=search_id, guild_id=guild_id, with_nick=kwargs.get('with_nick', False))
+        bot, guild, guild_id = cls._split_ctx(ctx, guild_id)
+        # Search by name instead, starting with guild members
+        if guild:
+            user = cls.from_search_discord_users(search_user, guild.members)
+            if user:
+                return user
+        # Search in PSQL table
+        async with bot.pool.acquire() as con:
+            all_users = await cls.from_psql_all(con, guild_id, **kwargs)
+        similarities = {}
+        for i in range(len(all_users)):
+            u = all_users[i]
+            names = []
+            if u.name:
+                names.append(u.name)
+            if u.all_nicks:
+                names += list(u.all_nicks.values())
+            if not names:
+                continue
+            _, sim = find_closest_match(search_user, names)
+            if sim:
+                similarities[i] = sim
+        if similarities:
+            closest_idx = max(similarities, key=similarities.get)
+            return all_users[closest_idx]
+        # Check bot cache, returns discord.User
+        user = cls.from_search_discord_users(search_user, bot.users)
+        if user:
+            return user
+        return None
+
+    @classmethod
+    async def from_id(cls, ctx: Union[MrBot, commands.Context], user_id: int, guild_id: int = None, **kwargs):
+        bot, _, guild_id = cls._split_ctx(ctx, guild_id=guild_id)
+        # Check cache
+        d_user = bot.get_user(user_id)
+        if d_user:
+            return cls.from_discord(d_user)
+        # Check PSQL
+        async with bot.pool.acquire() as con:
+            if kwargs.get('with_nick', False) and guild_id:
+                q = cls.make_psql_query(where='u.id=$2', with_nick=True)
+                r = await con.fetchrow(q, guild_id, user_id)
+            else:
+                q = cls.make_psql_query(where='u.id=$1', **kwargs)
+                r = await con.fetchrow(q, user_id)
+            if r:
+                return cls.from_psql_res(r)
+        # Fetch from API
+        try:
+            d_user = await bot.fetch_user(user_id)
+        except discord.errors.NotFound:
+            return None
+        return cls.from_discord(d_user)
+
+    @classmethod
+    def from_discord(cls, user: Union[discord.User, discord.Member]):
+        all_nicks = {}
+        activity = None
+        mobile = False
+        if isinstance(user, discord.Member):
+            all_nicks[user.guild.id] = user.nick
+            mobile = user.is_on_mobile()
+            if user.activity and user.activity.name:
+                activity = user.activity.name
+        return cls(
+            id_=user.id,
+            name=user.name,
+            discriminator=user.discriminator,
+            all_nicks=all_nicks,
+            avatar=user.avatar,
+            activity=activity,
+            mobile=mobile,
+        )
+
+    @classmethod
+    def from_psql_res(cls, res: asyncpg.Record, prefix: str = ''):
+        if not res.get(f'{prefix}id', None):
+            return None
+        all_nicks = {}
+        all_nicks_list = res.get(f'{prefix}all_nicks')
+        # We expect a list where each element (string) is [<name>, <guild_id>]
+        if all_nicks_list:
+            for nick_pair in all_nicks_list:
+                # Should never happen
+                if not nick_pair or not len(nick_pair) == 2:
+                    continue
+                nick, guild_id = nick_pair[0], nick_pair[1]
+                if nick is None or guild_id is None:
+                    continue
+                all_nicks[int(guild_id)] = nick
+        # We have nick and nick_guild_id instead
+        elif res.get(f'{prefix}nick') and res.get(f'{prefix}nick_guild_id'):
+            all_nicks[res[f'{prefix}nick_guild_id']] = res[f'{prefix}nick']
+        return cls(
+            id_=res.get(f'{prefix}id'),
+            name=res.get(f'{prefix}name'),
+            discriminator=res.get(f'{prefix}discriminator'),
+            avatar=res.get(f'{prefix}avatar'),
+            online=res.get(f'{prefix}online'),
+            offline=res.get(f'{prefix}offline'),
+            activity=res.get(f'{prefix}activity'),
+            mobile=res.get(f'{prefix}mobile'),
+            all_nicks=all_nicks,
+        )
+
+    @classmethod
+    async def from_psql_all(cls, con: asyncpg.Connection, guild_id=None, **kwargs):
+        """Returns all users from PSQL, kwargs passed to make_psql_query"""
+        if guild_id is not None and 'with_nick' in kwargs:
+            results = await con.fetch(cls.make_psql_query(**kwargs), guild_id)
+        else:
+            results = await con.fetch(cls.make_psql_query(**kwargs))
+        users = []
+        for r in results:
+            users.append(cls.from_psql_res(r))
+        return users

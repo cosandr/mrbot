@@ -1,0 +1,26 @@
+{
+    "name": "Two Buttons",
+    "file": "Two-Buttons.jpg",
+    "boxes": [
+        {
+            "start": [37, 70],
+            "size": [210, 100],
+            "text-align": [0, 0],
+            "angle": 16.5,
+            "fill": "white",
+            "font-size": 22,
+            "stroke-width": 2,
+            "stroke-fill": "black"
+        },
+        {
+            "start": [250, 30],
+            "size": [165, 95],
+            "text-align": [0, 0],
+            "angle": 16.5,
+            "fill": "white",
+            "font-size": 22,
+            "stroke-width": 2,
+            "stroke-fill": "black"
+        }
+    ]
+}

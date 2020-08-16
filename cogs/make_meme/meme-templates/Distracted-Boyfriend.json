@@ -1,0 +1,24 @@
+{
+    "name": "Distracted Boyfriend",
+    "file": "Distracted-Boyfriend.jpg",
+    "boxes": [
+        {
+            "start": [500, 8],
+            "size": [323, 115],
+            "text-align": [0, 1],
+            "fill": "white",
+            "font-size": 36,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        },
+        {
+            "start": [191, 518],
+            "size": [290, 177],
+            "text-align": [0, 0],
+            "fill": "white",
+            "font-size": 36,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        }
+    ]
+}

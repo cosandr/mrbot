@@ -1,0 +1,3 @@
+git+https://github.com/bryanforbes/discord.py@typings
+pytest
+pytest-benchmark

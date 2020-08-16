@@ -1,0 +1,24 @@
+{
+    "name": "Drake",
+    "file": "Drake-Hotline-Bling.jpg",
+    "boxes": [
+        {
+            "start": [630, 25],
+            "size": [513, 558],
+            "text-align": [-1, 0],
+            "fill": "white",
+            "font-size": 50,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        },
+        {
+            "start": [630, 615],
+            "size": [513, 558],
+            "text-align": [-1, 0],
+            "fill": "white",
+            "font-size": 50,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        }
+    ]
+}

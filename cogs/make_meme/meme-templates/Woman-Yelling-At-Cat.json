@@ -1,0 +1,24 @@
+{
+    "name": "Woman Yelling At Cat",
+    "file": "Woman-Yelling-At-Cat.jpg",
+    "boxes": [
+        {
+            "start": [12, 8],
+            "size": [317, 83],
+            "text-align": [0, -1],
+            "fill": "white",
+            "font-size": 36,
+            "stroke-width": 2,
+            "stroke-fill": "black"
+        },
+        {
+            "start": [350, 8],
+            "size": [317, 83],
+            "text-align": [0, -1],
+            "fill": "white",
+            "font-size": 36,
+            "stroke-width": 2,
+            "stroke-fill": "black"
+        }
+    ]
+}

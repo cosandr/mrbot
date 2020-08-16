@@ -1,0 +1,38 @@
+{
+    "id": 123,
+    "name": "test guild",
+    "members": {
+        "111": {
+            "name": "test user 1",
+            "self_role": true,
+            "roles": []
+        },
+        "222": {
+            "name": "test user 2",
+            "roles": ["role 1"]
+        }
+    },
+    "text_channels": {
+        "channel-one": {},
+        "channel-two": {
+            "roles": ["@everyone"]
+        },
+        "channel-three": {
+            "roles": ["role 1"]
+        },
+        "channel-four": {
+            "read_only": true,
+            "member_names": ["test user 1"],
+            "member_ids": [222],
+            "roles": ["role 1"]
+        }
+    },
+    "roles": {
+        "role 1": {
+          "view_audit_log": true,
+          "change_nickname": true,
+          "manage_nicknames": true,
+          "read_messages": true
+        }
+    }
+}

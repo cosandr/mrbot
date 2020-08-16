@@ -1,0 +1,24 @@
+{
+    "name": "Is This A Pigeon",
+    "file": "Is-This-A-Pigeon.jpg",
+    "boxes": [
+        {
+            "start": [1135, 135],
+            "size": [430, 380],
+            "text-align": [0, 0],
+            "fill": "white",
+            "font-size": 50,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        },
+        {
+            "start": [820, 760],
+            "size": [500, 160],
+            "text-align": [0, -1],
+            "fill": "white",
+            "font-size": 50,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        }
+    ]
+}

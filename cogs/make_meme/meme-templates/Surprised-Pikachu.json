@@ -1,0 +1,15 @@
+{
+    "name": "Surprised Pikachu",
+    "file": "Surprised-Pikachu.jpg",
+    "boxes": [
+        {
+            "start": [5, 5],
+            "size": [-1, 250],
+            "text-start": [0, 0],
+            "fill": "white",
+            "font-size": 36,
+            "stroke-width": 3,
+            "stroke-fill": "black"
+        }
+    ]
+}

@@ -1,0 +1,15 @@
+discord.py[voice]
+# git+https://github.com/Rapptz/discord.py@master#egg=discord.py[voice]
+jellyfish
+numpy
+Pillow
+wolframalpha
+youtube_dl
+asyncpg
+sympy
+psutil
+py-spy
+scipy
+matplotlib
+dateparser
+git+https://github.com/carpedm20/emoji@master
