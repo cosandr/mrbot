@@ -16,11 +16,11 @@ from discord.ext import commands
 
 import config as cfg
 import ext.embed_helpers as emh
-from mrbot import MrBot
 from ext.internal import User
 from ext.parsers import parsers
 from ext.psql import debug_query
 from ext.utils import paginate
+from mrbot import MrBot
 
 
 class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
@@ -396,7 +396,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         try:
             with redirect_stdout(stdout):
                 await func()
-        except Exception as e:
+        except Exception:
             value = stdout.getvalue()
             await ctx.message.add_reaction('❎')
             await ctx.send(f'```py\n{value}{format_exc()}\n```')

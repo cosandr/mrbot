@@ -14,9 +14,9 @@ from discord.ext import commands
 from pkg_resources import get_distribution
 
 import config as cfg
+from ext.brains import Response, BrainsAPIError
 from ext.embed_helpers import embed_local_file
 from ext.errors import MissingConfigError
-from ext.brains import Response, BrainsAPIError
 from ext.utils import cleanup_http_params, human_seconds
 
 
@@ -112,7 +112,7 @@ class MrBot(commands.Bot):
             return
 
         # Only process commands starting with a single prefix
-        if not message.content.startswith(self.command_prefix*2, 0, 2):
+        if not message.content.startswith(self.command_prefix * 2, 0, 2):
             await self.process_commands(message)
 
     @staticmethod
@@ -217,7 +217,7 @@ class MrBot(commands.Bot):
         for name in [k for k in self.extensions.keys()]:
             try:
                 self.unload_extension(name)
-            except:
+            except Exception:
                 self.logger.exception(f'Failed to unload {name}')
 
     async def brains_post_request(self, url: str, **kwargs) -> Response:
@@ -278,7 +278,7 @@ class MrBot(commands.Bot):
                     fw.write(wb)
                 os.chmod(file_path, 0o644)
                 self.logger.debug(f'Uploaded {file_name}')
-            except:
+            except Exception:
                 self.logger.exception(f'Cannot upload {file_name}')
                 return ''
         if await self.check_url_status(url):

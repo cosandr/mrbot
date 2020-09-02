@@ -1,3 +1,5 @@
-git+https://github.com/bryanforbes/discord.py@typings
+git+https://github.com/bryanforbes/asyncpg-stubs
+git+https://github.com/bryanforbes/discord.py-stubs
+flake8
 pytest
 pytest-benchmark
