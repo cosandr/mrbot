@@ -48,8 +48,7 @@ class MrBot(commands.Bot):
         root_logger.addHandler(fh)
         root_logger.addHandler(ch)
         # Discord logger (API stuff)
-        discord_logger = logging.getLogger('discord')
-        discord_logger.setLevel(logging.WARNING)
+        logging.getLogger('discord').setLevel(logging.WARNING)
         # Bot logger
         self.logger_name = self.__class__.__name__
         self.logger = logging.getLogger(self.logger_name)
@@ -59,7 +58,8 @@ class MrBot(commands.Bot):
         self.connect_task: asyncio.Task = self.loop.create_task(self.connect_sess())
         self.extension_override = kwargs.pop('extension_override', None)
         self.load_all_extensions()
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
+        self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
         # Queue for message logger
         self.msg_queue = asyncio.PriorityQueue()
         self.psql_lock = asyncio.Lock()
@@ -67,9 +67,14 @@ class MrBot(commands.Bot):
     def run(self, *args, **kwargs):
         super().run(self.config.token, *args, **kwargs)
 
-    def _signal_handler(self, _signal_num, _frame) -> None:
+    def _handler_close(self) -> None:
         """Close gracefully on SIGTERM"""
         self.loop.create_task(self.close())
+
+    def _handler_reload(self) -> None:
+        """Reload cogs on SIGHUP"""
+        self.unload_all_extensions()
+        self.load_all_extensions()
 
     async def connect_sess(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
