@@ -6,12 +6,12 @@ from typing import List
 import discord
 from discord.ext import commands
 
-from mrbot import MrBot
 from config import TIME_FORMAT
 from ext import utils
 from ext.internal import Message, User, Guild
 from ext.parsers import parsers
 from ext.psql import create_table, try_run_query
+from mrbot import MrBot
 from .pasta import Pasta
 
 
@@ -102,9 +102,9 @@ class PastaCog(commands.Cog, name="Pasta"):
         parser_args=[
             parsers.Arg('name', type=str.lower, help='Pasta name'),
             parsers.Arg('content', nargs='*', help='Pasta content'),
-            parsers.Arg('-m', '--message_id', type=int, action='append', help='Use content from message IDs'),
-            parsers.Arg('--no_user', default=False, help='Do not register yourself as owner', action='store_true'),
-            parsers.Arg('--no_guild', default=False, help='Do not register pasta with the current guild', action='store_true'),
+            parsers.Arg('-m', '--message-id', type=int, action='append', help='Use content from message IDs'),
+            parsers.Arg('--no-user', default=False, help='Do not register yourself as owner', action='store_true'),
+            parsers.Arg('--no-guild', default=False, help='Do not register pasta with the current guild', action='store_true'),
         ],
     )
     async def pasta_add(self, ctx: commands.Context, *args):
@@ -115,7 +115,6 @@ class PastaCog(commands.Cog, name="Pasta"):
         res = await self.bot.pool.fetchrow(q, parsed.name)
         if p := Pasta.from_psql_res(res):
             return await ctx.send(f'Pasta {parsed.name} already exists.', embed=self.embed_pasta_info(p))
-        p = Pasta(name=parsed.name, content='')
         # Did we get content directly?
         if parsed.content:
             content = ' '.join(parsed.content)
@@ -152,7 +151,7 @@ class PastaCog(commands.Cog, name="Pasta"):
         p = Pasta.from_psql_res(res)
         if not p:
             return await ctx.send(f'No pasta {name} found.')
-        if err := p.edit_error():
+        if err := p.edit_error(ctx):
             return await ctx.send(err)
         async with self.bot.pool.acquire() as con:
             async with con.transaction():
@@ -166,9 +165,9 @@ class PastaCog(commands.Cog, name="Pasta"):
         parser_args=[
             parsers.Arg('-n', '--name', type=str.lower, help='Change name'),
             parsers.Arg('-c', '--content', nargs='*', help='Change content'),
-            parsers.Arg('-m', '--message_id', type=int, action='append', help='Use content from message IDs'),
+            parsers.Arg('-m', '--message-id', type=int, action='append', help='Use content from message IDs'),
             parsers.Arg('-u', '--user', type=int, help='Change owner, use 0 to remove'),
-            parsers.Arg('-g', '--guild_id', type=int, help='Change guild, use 0 to remove'),
+            parsers.Arg('-g', '--guild-id', type=int, help='Change guild, use 0 to remove'),
         ],
     )
     async def pasta_edit(self, ctx: commands.Context, name: str, *args):
