@@ -61,6 +61,10 @@ class User(Common):
     psql_all_tables = Guild.psql_all_tables.copy()
     psql_all_tables.update({(psql_table_name, psql_table_name_nicks, psql_table_name_activity_log): psql_table})
 
+    __slots__ = Common.__slots__ + \
+        ('id', 'name', '_discriminator', 'all_nicks', 'avatar',
+         'online', 'offline', 'activity', 'mobile')
+
     def __init__(self, id_: int, name: str = None, discriminator: int = None, avatar: str = None,
                  online: datetime = None, offline: datetime = None, activity: str = None, mobile=False,
                  all_nicks: dict = None):

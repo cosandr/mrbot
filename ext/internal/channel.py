@@ -24,6 +24,9 @@ class Channel(Common):
     psql_all_tables = Guild.psql_all_tables.copy()
     psql_all_tables.update({(psql_table_name,): psql_table})
 
+    __slots__ = Common.__slots__ + \
+        ('id', 'name', 'guild', 'voice')
+
     def __init__(self, id_: int, name: str = None, guild: Guild = None, voice: bool = False):
         self.id: int = id_
         self.name: str = name

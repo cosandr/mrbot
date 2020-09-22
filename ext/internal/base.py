@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
-from typing import List, Tuple, Dict
+from typing import Tuple, Dict, Set
 
 import asyncpg
 import discord
@@ -37,7 +37,7 @@ class CommonMeta(metaclass=ABCMeta):
         raise NotImplemented
 
     @abstractmethod
-    def diff(self, other) -> List[str]:
+    def diff(self, other) -> Set[str]:
         raise NotImplemented
 
     @abstractmethod
@@ -65,10 +65,13 @@ class CommonMeta(metaclass=ABCMeta):
 
 
 class Common(CommonMeta):
+    # __slots__ = ('psql_table', 'psql_table_name', 'psql_all_tables')
+    __slots__ = ()
+
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        for k in self._props:
+        for k in self.__slots__:
             if getattr(self, k) != getattr(other, k):
                 return False
         return True
@@ -78,7 +81,7 @@ class Common(CommonMeta):
 
     def __repr__(self):
         attrs = []
-        for k in self._props:
+        for k in self.__slots__:
             name = k
             # Remove leading _, we probably have a setter
             if name[0] == '_':
@@ -88,6 +91,12 @@ class Common(CommonMeta):
                 name = 'id_'
             attrs.append(f'{name}={repr(getattr(self, k))}')
         return f'{self.__class__.__name__}({", ".join(attrs)})'
+
+    def asdict(self) -> dict:
+        ret = {}
+        for k in self.__slots__:
+            ret[k] = getattr(self, k)
+        return ret
 
     @property
     @abstractmethod
@@ -106,7 +115,7 @@ class Common(CommonMeta):
 
     def pretty_repr(self, _level=0) -> str:
         attrs = []
-        for k in self._props:
+        for k in self.__slots__:
             name = k
             if name[0] == '_':
                 name = name[1:]
@@ -121,26 +130,14 @@ class Common(CommonMeta):
                     attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
         return "\n".join(attrs)
 
-    @property
-    def _props(self) -> List[str]:
-        """Return list of instance attributes which should be compared
-
-        Excludes class attributes"""
-        ret = []
-        for k in vars(self).keys():
-            if k.startswith(("__", "psql_table")) or k == "psql_all_tables":
-                continue
-            ret.append(k)
-        return ret
-
-    def diff(self, other) -> List[str]:
+    def diff(self, other) -> Set[str]:
         """Returns list of properties which are different"""
         if not isinstance(other, self.__class__):
             raise TypeError(f'Cannot compare {type(self)} to {type(other)}')
-        props = []
-        for k in self._props:
+        props = set()
+        for k in self.__slots__:
             if getattr(self, k) != getattr(other, k):
-                props.append(k)
+                props.add(k)
         return props
 
     @abstractmethod

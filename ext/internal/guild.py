@@ -20,6 +20,9 @@ class Guild(Common):
     """
     psql_all_tables = {(psql_table_name,): psql_table}
 
+    __slots__ = Common.__slots__ + \
+        ('id', 'name')
+
     def __init__(self, id_: int, name: str = None):
         self.id: int = id_
         self.name: str = name

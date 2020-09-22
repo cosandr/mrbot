@@ -62,6 +62,9 @@ class Message(Common):
     psql_all_tables.update(User.psql_all_tables)
     psql_all_tables.update({(psql_table_name, psql_table_name_edits): psql_table})
 
+    __slots__ = Common.__slots__ + \
+        ('id', 'time', 'content', 'attachments', 'embed', 'deleted', 'edits', 'author', 'channel', 'guild')
+
     # noinspection PyTypeChecker
     def __init__(self, id_: int, time_: datetime = None, content: str = '', attachments: List[str] = None,
                  embed: dict = None, deleted: bool = False, edits: list = None, author: User = None,
