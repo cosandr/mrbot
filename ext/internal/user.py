@@ -191,7 +191,9 @@ class User(Common):
         """Returns a query to insert/update user status table"""
         q = (f'INSERT INTO {self.psql_table_name_status} '
              '(user_id, online, mobile, time) VALUES ($1, $2, $3, $4)')
-        q_args = [self.id, self.online, self.mobile, self.status_time or datetime.utcnow()]
+        # Assume online if we don't have it, presumably user was online if their status changed
+        online = True if self.online is None else self.online
+        q_args = [self.id, online, self.mobile, self.status_time or datetime.utcnow()]
         return q, q_args
 
     async def to_discord(self, ctx: Union[MrBot, commands.Context], guild_id: int = None) -> Optional[Union[discord.Member, discord.User]]:
