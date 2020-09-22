@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Union, Tuple, List, Optional, Dict
+from typing import Union, Tuple, List, Optional, Dict, Set
 
 import asyncpg
 import discord
 from discord.ext import commands
+from jellyfish import jaro_winkler_similarity
 
 from ext.utils import re_id, find_closest_match
 from mrbot import MrBot
@@ -123,6 +124,40 @@ class User(Common):
         if self.name:
             return self.name
         return ''
+
+    def diff_tol(self, other: User, guild_id=None, all_nicks=False) -> Set[str]:
+        """Returns set of different attributes
+
+        :param other: User to compare to
+        :param guild_id: Only compare nickname for this guild, adds `nick` to diff
+        :param all_nicks: Include all_nicks, assumed if guild_id is provided
+        :return: Set of differences"""
+        diff_attr = set()
+        check_attr = set(self.__slots__)
+        # Don't check times, we only care about the values themselves
+        check_attr.discard('activity_time')
+        check_attr.discard('status_time')
+        if guild_id:
+            all_nicks = False
+            if self.get_nick(guild_id) != other.get_nick(guild_id):
+                diff_attr.add('nick')
+        if not all_nicks:
+            check_attr.discard('all_nicks')
+
+        if all((self.activity, other.activity)):
+            # Don't check it for equality later
+            check_attr.discard('activity')
+            if jaro_winkler_similarity(self.activity.lower(), other.activity.lower()) < 0.9:
+                diff_attr.add('activity')
+
+        # Check remainder for equality
+        for k in check_attr:
+            name = k
+            if name[0] == '_':
+                name = name[1:]
+            if getattr(self, k) != getattr(other, k):
+                diff_attr.add(name)
+        return diff_attr
 
     def get_nick(self, guild_id: int):
         """Returns first nick, or empty string if it doesn't exist"""

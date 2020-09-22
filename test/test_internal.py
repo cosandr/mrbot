@@ -221,6 +221,59 @@ class InternalTests(unittest.TestCase):
                   online=True, mobile=False, status_time=datetime(2020, 9, 11, 22, 50))
         self.assertNotEqual(u1, u2)
 
+    def test_user_diff_tol(self):
+        dt = datetime.utcnow()
+        dt_later = dt + timedelta(hours=1)
+        # No online/offline
+        u1 = User(100)
+        u2 = User(100)
+        self.assertSetEqual(u1.diff_tol(u2), set())
+        # Only one online
+        u1 = User(100, status_time=dt, online=True)
+        u2 = User(100)
+        self.assertSetEqual(u1.diff_tol(u2), {'online'})
+        # Both online
+        u1 = User(100, status_time=dt, online=True)
+        u2 = User(100, status_time=dt, online=True)
+        self.assertSetEqual(u1.diff_tol(u2), set())
+        # Only one offline
+        u1 = User(100, status_time=dt, online=False)
+        u2 = User(100)
+        self.assertSetEqual(u1.diff_tol(u2), {'online'})
+        # Check activities, different
+        u1 = User(100, activity='test')
+        u2 = User(100)
+        self.assertSetEqual(u1.diff_tol(u2), {'activity'})
+        # Same
+        u1 = User(100, activity='test')
+        u2 = User(100, activity='test')
+        self.assertSetEqual(u1.diff_tol(u2), set())
+        # Similar, different case
+        u1 = User(100, activity='test')
+        u2 = User(100, activity='Test')
+        self.assertSetEqual(u1.diff_tol(u2), set())
+        # Similar, one more letter
+        u1 = User(100, activity='test')
+        u2 = User(100, activity='tests')
+        self.assertSetEqual(u1.diff_tol(u2), set())
+        # Similar
+        u1 = User(100, activity='Call of Duty: Modern Warfare')
+        u2 = User(100, activity='Call of Duty®: Modern Warfare®')
+        self.assertSetEqual(u1.diff_tol(u2), set())
+        # Not similar
+        u1 = User(100, activity='Call of Duty: Modern Warfare')
+        u2 = User(100, activity='Visual Studio Code')
+        self.assertSetEqual(u1.diff_tol(u2), {'activity'})
+        # Different everything
+        u1 = User(100, name='user 1', discriminator=1, avatar='avatar1', all_nicks={10: 'nick1'},
+                  activity='Call of Duty: Modern Warfare', activity_time=dt,
+                  online=True, mobile=False, status_time=dt)
+        u2 = User(101, name='user 2', discriminator=2, avatar='avatar2', all_nicks={10: 'nick2'},
+                  activity='Visual Studio Code', activity_time=dt_later,
+                  online=False, mobile=True, status_time=dt_later)
+        self.assertSetEqual(u1.diff_tol(u2, all_nicks=True), {'id', 'name', 'discriminator', 'avatar', 'all_nicks',
+                                                              'activity', 'online', 'mobile'})
+
     def test_user_diff(self):
         u1 = User(100, name='User 1')
         u2 = User(100, name='User 2')
