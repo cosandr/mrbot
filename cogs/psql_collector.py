@@ -4,89 +4,55 @@ import logging
 import re
 import time
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Union, NamedTuple, Dict
 
 import asyncpg
 import discord
 from discord.ext import commands
 
-from mrbot import MrBot
 from ext.internal import Channel, Guild, Message, User
 from ext.psql import create_table, debug_query, ensure_foreign_key, try_foreign_key_add
 from ext.utils import QueueItem
+from mrbot import MrBot
+
+
+class Cache(NamedTuple):
+    users: Dict[int, User]
+    channels: Dict[int, Channel]
+    guilds: Dict[int, Guild]
 
 
 class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': True}):
-    psql_table_name_typed = 'stalk_typed'
-    psql_table_name_voice = 'stalk_voice'
-    psql_table_name_typed_log = f'{psql_table_name_typed}_log'
-    psql_table_name_voice_log = f'{psql_table_name_voice}_log'
+    psql_table_name_typed = 'typed_log'
+    psql_table_name_voice = 'voice_log'
     psql_table_name_command_log = 'command_log'
     psql_table = f"""
         CREATE TABLE IF NOT EXISTS {psql_table_name_typed} (
             time      TIMESTAMP NOT NULL,
             user_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
-            ch_id     BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id),
-            guild_id  BIGINT REFERENCES {Guild.psql_table_name} (id),
-            UNIQUE (user_id)
+            ch_id     BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
+            guild_id  BIGINT REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS {psql_table_name_voice} (
-            connect    TIMESTAMP,
-            disconnect TIMESTAMP,
+            connected  BOOLEAN NOT NULL,
+            time       TIMESTAMP NOT NULL,
             user_id    BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
-            ch_id      BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id),
-            guild_id   BIGINT NOT NULL REFERENCES {Guild.psql_table_name} (id),
-            UNIQUE (user_id),
-            CONSTRAINT chk_empty CHECK (connect IS NOT NULL OR disconnect IS NOT NULL)
+            ch_id      BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
+            guild_id   BIGINT NOT NULL REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS {psql_table_name_command_log} (
             name     VARCHAR(200) NOT NULL,
             cog_name VARCHAR(100),
             time     TIMESTAMP NOT NULL,
-            bot_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id),
-            user_id  BIGINT NOT NULL REFERENCES {User.psql_table_name} (id),
-            ch_id    BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id),
-            guild_id BIGINT REFERENCES {Guild.psql_table_name} (id)
+            bot_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
+            user_id  BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
+            ch_id    BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
+            guild_id BIGINT REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
         );
-        CREATE TABLE IF NOT EXISTS {psql_table_name_typed_log} (
-            time      TIMESTAMP NOT NULL,
-            user_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
-            ch_id     BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
-            guild_id  BIGINT REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
-        );
-        CREATE OR REPLACE FUNCTION log_{psql_table_name_typed}()
-            RETURNS trigger AS $$
-        BEGIN
-            INSERT INTO {psql_table_name_typed_log} VALUES (OLD.time, OLD.user_id, OLD.ch_id, OLD.guild_id);
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        DROP TRIGGER IF EXISTS trigger_log_{psql_table_name_typed} ON {psql_table_name_typed};
-        CREATE TRIGGER trigger_log_{psql_table_name_typed} BEFORE UPDATE ON {psql_table_name_typed}
-            FOR EACH ROW EXECUTE PROCEDURE log_{psql_table_name_typed}();
-
-        CREATE TABLE IF NOT EXISTS {psql_table_name_voice_log} (
-            connect    TIMESTAMP,
-            disconnect TIMESTAMP,
-            user_id    BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
-            ch_id      BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
-            guild_id   BIGINT NOT NULL REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
-        );
-        CREATE OR REPLACE FUNCTION log_{psql_table_name_voice}()
-            RETURNS trigger AS $$
-        BEGIN
-            INSERT INTO {psql_table_name_voice_log} VALUES (OLD.connect, OLD.disconnect, OLD.user_id, OLD.ch_id, OLD.guild_id);
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        DROP TRIGGER IF EXISTS trigger_log_{psql_table_name_voice} ON {psql_table_name_voice};
-        CREATE TRIGGER trigger_log_{psql_table_name_voice} BEFORE UPDATE ON {psql_table_name_voice}
-            FOR EACH ROW EXECUTE PROCEDURE log_{psql_table_name_voice}();
     """
     # Message already depends on Guild, Channel and User tables
     psql_all_tables = Message.psql_all_tables.copy()
-    psql_all_tables.update({(psql_table_name_typed, psql_table_name_voice, psql_table_name_command_log,
-                             psql_table_name_typed_log, psql_table_name_voice_log): psql_table})
+    psql_all_tables.update({(psql_table_name_typed, psql_table_name_voice, psql_table_name_command_log): psql_table})
 
     def __init__(self, bot):
         self.bot: MrBot = bot
@@ -99,7 +65,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         # --- Logger ---
         self.re_key = re.compile(r'Key.*is not present in table \"(\w+)\"\.')
         self.bot.loop.create_task(self.async_init())
-        self._cache = dict(users={}, channels={}, guilds={})
+        self._cache = Cache({}, {}, {})
 
     async def async_init(self):
         await self.bot.connect_task
@@ -110,14 +76,14 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         self.con = await self.bot.pool.acquire()
         self.logger.info('Connection acquired')
         # Load from PSQL into cache
-        for u in (await User.from_psql_all(self.con, with_all_nicks=True)):
-            self._cache['users'][u.id] = u
+        for u in (await User.from_psql_all(self.con, with_all_nicks=True, with_activity=True, with_status=True)):
+            self._cache.users[u.id] = u
         for c in (await Channel.from_psql_all(self.con, with_guild=True)):
-            self._cache['channels'][c.id] = c
+            self._cache.channels[c.id] = c
         for g in (await Guild.from_psql_all(self.con)):
-            self._cache['guilds'][g.id] = g
+            self._cache.guilds[g.id] = g
         self.logger.info('Loaded %d guilds, %d channels and %d users',
-                         len(self._cache['guilds']), len(self._cache['channels']), len(self._cache['users']))
+                         len(self._cache.guilds), len(self._cache.channels), len(self._cache.users))
         # Ensure bot is in user table first
         await self.bot.wait_until_ready()
         await self.bot.msg_queue.put(QueueItem(0, ensure_foreign_key(con=self.con, obj=User.from_discord(self.bot.user),
@@ -139,25 +105,38 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
             except Exception as e:
                 self.logger.warning('Connection release failed: %s', str(e))
 
-    #region Event Listeners
+    # region Event Listeners
+
+    @commands.Cog.listener()
+    async def on_typing(self, channel: discord.abc.Messageable, user: Union[discord.User, discord.Member], when: datetime):
+        """Update typed_log"""
+        if self.queue_task.done():
+            return
+        # Ignore DMs
+        if not hasattr(channel, 'guild'):
+            return
+        # Ignore bots
+        if user.bot:
+            return
+        int_user = User.from_discord(user)
+        int_channel = Channel.from_discord(channel)
+        q = (f'INSERT INTO {self.psql_table_name_typed} '
+             '(time, user_id, ch_id, guild_id) VALUES ($1, $2, $3, $4)')
+        q_args = [when, int_user.id, int_channel.id, int_channel.guild_id]
+        await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_channel)))
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Update voice_log"""
+        q = (f'INSERT INTO {self.psql_table_name_voice} '
+             '(connected, time, user_id, ch_id, guild_id) VALUES ($1, $2, $3, $4, $5)')
         # User connected to channel
         if after.channel:
-            q = (f'INSERT INTO {self.psql_table_name_voice} '
-                 '(connect, user_id, ch_id, guild_id) VALUES ($1, $2, $3, $4) '
-                 'ON CONFLICT (user_id) DO UPDATE SET '
-                 'connect=$1, ch_id=$3, guild_id=$4')
-            q_args = [datetime.utcnow(), member.id, after.channel.id, after.channel.guild.id]
+            q_args = [True, datetime.utcnow(), member.id, after.channel.id, after.channel.guild.id]
             channel = Channel.from_discord(after.channel)
         # User disconnected
         elif before.channel:
-            q = (f'INSERT INTO {self.psql_table_name_voice} '
-                 '(disconnect, user_id, ch_id, guild_id) VALUES ($1, $2, $3, $4) '
-                 'ON CONFLICT (user_id) DO UPDATE SET '
-                 'disconnect=$1, ch_id=$3, guild_id=$4')
-            q_args = [datetime.utcnow(), member.id, before.channel.id, before.channel.guild.id]
+            q_args = [False, datetime.utcnow(), member.id, before.channel.id, before.channel.guild.id]
             channel = Channel.from_discord(before.channel)
         else:
             return
@@ -168,6 +147,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
 
     @commands.Cog.listener()
     async def on_command(self, ctx: commands.Context):
+        """Update command_log"""
         cog_name = ctx.cog.__cog_name__ if ctx.cog else None
         guild_id = ctx.guild.id if ctx.guild else None
         q = (f'INSERT INTO {self.psql_table_name_command_log} '
@@ -181,37 +161,16 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_ch, guild=int_guild)))
 
     @commands.Cog.listener()
-    async def on_typing(self, channel: discord.abc.Messageable, user: Union[discord.User, discord.Member], when: datetime):
-        if self.queue_task.done():
-            return
-        # Ignore DMs
-        if not hasattr(channel, 'guild'):
-            return
-        # Ignore bots
-        if user.bot:
-            return
-        int_user = User.from_discord(user)
-        int_channel = Channel.from_discord(channel)
-        q = (f'INSERT INTO {self.psql_table_name_typed} (time, user_id, ch_id, guild_id) '
-             'VALUES ($1, $2, $3, $4) ON CONFLICT (user_id) DO UPDATE SET time=$1')
-        q_args = [when, int_user.id, int_channel.id, int_channel.guild_id]
-        await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_channel)))
-
-    @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """Update user_status"""
         if self.queue_task.done():
             return
         user = User.from_discord(after)
-        # Get cached user to avoid unnecessary updates
-        cached_user: Optional[User] = self._cache['users'].get(user.id)
-        if str(after.status) != "offline":
-            user.online = datetime.utcnow()
-            if cached_user:
-                user.offline = cached_user.offline
-        else:
-            user.offline = datetime.utcnow()
-            if cached_user:
-                user.online = cached_user.online
+        if before.status != after.status:
+            user.status_time = datetime.utcnow()
+        if before.activity != after.activity:
+            user.activity_time = datetime.utcnow()
+
         # Ignore activities for bots
         if after.bot:
             user.activity = None
@@ -219,6 +178,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        """Update messages"""
         # Don't do anything if worker is not running
         if self.queue_task.done():
             return
@@ -233,6 +193,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        """Update message_edits"""
         if self.queue_task.done():
             return
         # Ignore self edits
@@ -245,15 +206,16 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        """Update messages"""
         if self.queue_task.done():
             return
         msg = Message(id_=payload.message_id, deleted=True)
         q, q_args = msg.to_psql_mark_deleted()
         await self.bot.msg_queue.put(QueueItem(2, self.run_query(q, q_args, msg=msg)))
 
-    #endregion
+    # endregion
 
-    #region Queue Functions
+    # region Queue Functions
 
     async def run_queue(self):
         self.logger.debug('Queue runner started')
@@ -294,39 +256,60 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
                     await self.ensure_con()
                 return
 
-    #endregion
+    # endregion
 
-    #region Integrity functions
+    # region Integrity functions
 
     async def check_and_update(self, user: User = None, channel: Channel = None, guild: Guild = None):
         """Updates cache and PSQL tables if needed"""
         if channel:
             if not guild and channel.guild:
                 guild = channel.guild
-            if self._cache['channels'].get(channel.id) != channel:
+            if self._cache.channels.get(channel.id) != channel:
                 q, q_args = channel.to_psql()
                 await self.bot.msg_queue.put(QueueItem(7, self.run_query(q, q_args, channel=channel, guild=guild)))
-                self._cache['channels'][channel.id] = channel
+                self._cache.channels[channel.id] = channel
                 self.logger.info('Updated channel %s in guild %s', str(channel), str(guild))
-        if guild and self._cache['guilds'].get(guild.id) != guild:
+        if guild and self._cache.guilds.get(guild.id) != guild:
             q, q_args = guild.to_psql()
             await self.bot.msg_queue.put(QueueItem(6, self.run_query(q, q_args, guild=guild)))
-            self._cache['guilds'][guild.id] = guild
+            self._cache.guilds[guild.id] = guild
             self.logger.info('Updated guild %s', str(guild))
-        cached_user: Optional[User] = self._cache['users'].get(user.id)
-        if user and cached_user != user:
-            q, q_args = user.to_psql()
-            await self.bot.msg_queue.put(QueueItem(8, self.run_query(q, q_args, user=user)))
-            self.logger.info('Updated user %s', str(user))
-        if not guild or not cached_user or not user:
-            self._cache['users'][user.id] = user
-            return
-        # Do we need to update nickname?
-        if cached_user.get_nick(guild.id) != user.get_nick(guild.id):
-            q, q_args = user.to_psql_nick(guild.id)
-            await self.bot.msg_queue.put(QueueItem(10, self.run_query(q, q_args, user=user, guild=guild)))
-            self.logger.info('Updated user nick %s in guild %s', str(user), str(guild))
-        self._cache['users'][user.id] = user
+        default_user = User(0)
+        cached_user: Optional[User] = self._cache.users.get(user.id, default_user)
+        if user:
+            # Determine what is different
+            diff = cached_user.diff_tol(user, guild_id=getattr(guild, 'id', None), all_nicks=False)
+            if not diff:
+                return
+            if any(k in diff for k in ('id', 'name', 'discriminator', 'avatar')):
+                q, q_args = user.to_psql()
+                await self.bot.msg_queue.put(QueueItem(8, self.run_query(q, q_args, user=user)))
+            if 'activity' in diff:
+                q, q_args = user.to_psql_activity()
+                await self.bot.msg_queue.put(QueueItem(8, self.run_query(q, q_args, user=user)))
+            if any(k in diff for k in ('online', 'mobile')):
+                q, q_args = user.to_psql_status()
+                await self.bot.msg_queue.put(QueueItem(8, self.run_query(q, q_args, user=user)))
+            if 'nick' in diff:
+                q, q_args = user.to_psql_nick(guild.id)
+                await self.bot.msg_queue.put(QueueItem(8, self.run_query(q, q_args, user=user, guild=guild)))
+            # Shouldn't happen
+            if cached_user == default_user:
+                self.logger.info('Added new user %s', str(user))
+            else:
+                info_msg = []
+                debug_msg = []
+                for k in diff:
+                    if k == 'nick':
+                        info_msg.append(f'nick [{str(guild)}]')
+                        debug_msg.append(f'\tnick [{str(guild)}]: {getattr(cached_user, k)} -> {getattr(user, k)}')
+                    else:
+                        info_msg.append(k)
+                        debug_msg.append(f'\t{k}: {getattr(cached_user, k)} -> {getattr(user, k)}')
+                self.logger.info('Updated %s for user %s', ', '.join(info_msg), str(user))
+                self.logger.debug('\n%s', '\n'.join(debug_msg))
+            self._cache.users[user.id] = user
 
     async def ensure_con(self):
         if self.queue_task.done():
@@ -347,7 +330,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
             self.logger.info('Connection reacquired')
         self.logger.info('Connection reacquired in %.3fms', (time.perf_counter()-start)*1000)
 
-    #endregion
+    # endregion
 
 
 def setup(bot):
