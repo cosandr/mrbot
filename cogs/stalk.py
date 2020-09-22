@@ -1,14 +1,15 @@
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
 import dateparser
 from discord.ext import commands
 
-from mrbot import MrBot
 from cogs.psql_collector import Collector
 from ext.internal import Channel, Guild, Message, User
 from ext.parsers import parsers
 from ext.utils import human_timedelta_short, transparent_embed
+from mrbot import MrBot
 
 
 class Stalk(commands.Cog, name="Stalk"):
@@ -66,7 +67,7 @@ class Stalk(commands.Cog, name="Stalk"):
     async def stalk(self, ctx, *args: str):
         parsed = ctx.command.parser.parse_args(args)
         search_user = ' '.join(parsed.user)
-        int_user = await User.from_search(ctx, search=search_user, with_nick=True)
+        int_user = await User.from_search(ctx, search=search_user, with_nick=True, with_activity=True, with_status=True)
         user = await int_user.to_discord(ctx)
         if not user:
             return await ctx.send(f'Cannot find user {search_user}')
@@ -82,44 +83,58 @@ class Stalk(commands.Cog, name="Stalk"):
             embed.description = f"User created: {human_timedelta_short(user.created_at)}\n"
             if hasattr(user, 'joined_at'):
                 embed.description += f"Joined guild: {human_timedelta_short(user.joined_at)}\n"
-        embed.set_thumbnail(url=user.avatar_url)
-        result_dict = {'status': dict(online=int_user.online, offline=int_user.offline,
-                                      activity=int_user.activity, mobile='Yes' if int_user.mobile else 'No')}
-        # Latest message
+        embed.set_thumbnail(url=str(user.avatar_url))
+        result_dict = {'status': dict(activity=int_user.activity, mobile='Yes' if int_user.mobile else 'No')}
+
         async with self.bot.pool.acquire() as con:
+            # Latest online-offline transition
+            q = ('SELECT s1.online, s1.time FROM ('
+                 'SELECT s2.online, s2.time, lead(s2.online) OVER (ORDER BY s2.time DESC) as prev_online '
+                 f'FROM {User.psql_table_name_status} s2 '
+                 'WHERE s2.user_id=$1 ORDER BY s2.time DESC) as s1 '
+                 'WHERE s1.online IS DISTINCT FROM s1.prev_online '
+                 'ORDER BY s1.time DESC LIMIT 2')
+            res = await con.fetch(q, user.id)
+            for r in res:
+                if r['online']:
+                    result_dict['status']['online'] = r['time']
+                else:
+                    result_dict['status']['offline'] = r['time']
+            # Latest message
             q = Message.make_psql_query(with_channel=True, with_guild=True, where='user_id=$1 ORDER BY time DESC LIMIT 1')
             res = await con.fetchrow(q, user.id)
             if res:
                 msg: Message = await Message.from_psql_res(res)
-                result_dict['msg'] = dict(time=msg.time, channel=msg.channel.to_dict(), guild=msg.guild.to_dict() if msg.guild else None)
+                result_dict['msg'] = dict(time=msg.time, channel=msg.channel.asdict(),
+                                          guild=msg.guild.asdict() if msg.guild else None)
 
-        # Last typed
-        async with self.bot.pool.acquire() as con:
+            # Last typed
             q = ('SELECT t.time, t.ch_id, t.guild_id, c.name AS ch_name, g.name AS guild_name '
                  f'FROM {Collector.psql_table_name_typed} t '
                  f'INNER JOIN {Channel.psql_table_name} c ON (t.ch_id = c.id) '
                  f'LEFT JOIN {Guild.psql_table_name} g ON (t.guild_id = g.id) '
-                 'WHERE t.user_id=$1')
+                 'WHERE t.user_id=$1 ORDER BY t.time DESC LIMIT 1')
             res = await con.fetchrow(q, user.id)
             if res:
                 channel: Channel = Channel.from_psql_res(res, prefix='ch_')
                 guild: Guild = Guild.from_psql_res(res, prefix='guild_')
-                result_dict['typed'] = dict(time=res['time'], channel=channel.to_dict(),
-                                            guild=guild.to_dict() if guild else None)
+                result_dict['typed'] = dict(time=res['time'], channel=channel.asdict(),
+                                            guild=guild.asdict() if guild else None)
 
-        # Last voice channel
-        async with self.bot.pool.acquire() as con:
-            q = ('SELECT v.connect, v.disconnect, v.ch_id, v.guild_id, c.name AS ch_name, g.name AS guild_name '
+            # Last voice channel
+            q = ('SELECT v.time AS connect, vd.time AS disconnect, v.ch_id, v.guild_id, c.name AS ch_name, g.name AS guild_name '
                  f'FROM {Collector.psql_table_name_voice} v '
                  f'INNER JOIN {Channel.psql_table_name} c ON (v.ch_id = c.id) '
                  f'LEFT JOIN {Guild.psql_table_name} g ON (v.guild_id = g.id) '
-                 'WHERE v.user_id=$1')
+                 f'LEFT JOIN LATERAL (SELECT time FROM {Collector.psql_table_name_voice} '
+                 'WHERE user_id = v.user_id AND ch_id = v.ch_id AND connected = false ORDER BY time DESC LIMIT 1) vd ON true '
+                 'WHERE v.user_id=$1 AND v.connected = true ORDER BY v.time DESC LIMIT 1')
             res = await con.fetchrow(q, user.id)
             if res:
                 channel: Channel = Channel.from_psql_res(res, prefix='ch_')
                 guild: Guild = Guild.from_psql_res(res, prefix='guild_')
-                result_dict['vc'] = dict(start=res['connect'], stop=res['disconnect'], channel=channel.to_dict(),
-                                         guild=guild.to_dict() if guild else None)
+                result_dict['vc'] = dict(start=res['connect'], stop=res['disconnect'], channel=channel.asdict(),
+                                         guild=guild.asdict() if guild else None)
 
         def walk_dict(in_dict, ref, ret_str: str):
             for k, v in in_dict.items():
@@ -152,8 +167,8 @@ class Stalk(commands.Cog, name="Stalk"):
     )
     async def cmdstats(self, ctx, *args):
         parsed = ctx.command.parser.parse_args(args)
-        user = None
-        q = 'SELECT name, COUNT(1) AS count FROM command_log '
+        user: Optional[User] = None
+        q = f'SELECT name, COUNT(1) AS count FROM {Collector.psql_table_name_command_log} '
         title = 'Top {0} most used commands'
         q_args = [parsed.limit]
         if parsed.user:
