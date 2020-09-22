@@ -37,12 +37,26 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             raise commands.errors.NotOwner
         return True
 
-    @commands.command(name='user-search', brief='Run User.from_search()')
-    async def test_user_search(self, ctx, *, search: str):
-        user = await User.from_search(ctx, search)
+    @parsers.command(
+        name='user-search',
+        brief='Run User.from_search()',
+        parser_args=[
+            parsers.Arg('search', nargs='+', help='Search term'),
+            parsers.Arg('--with_nick', default=False, help='Fetch nick', action='store_true'),
+            parsers.Arg('--with_all_nicks', default=False, help='Fetch all nicknames', action='store_true'),
+            parsers.Arg('--with_activity', default=False, help='Fetch latest activity', action='store_true'),
+            parsers.Arg('--with_status', default=False, help='Fetch latest status', action='store_true'),
+        ],
+    )
+    async def test_user_search(self, ctx, *args):
+        parsed = ctx.command.parser.parse_args(args)
+        search = ' '.join(parsed.search)
+        kwargs = vars(parsed)
+        kwargs.pop('search')
+        user = await User.from_search(ctx, search, **kwargs)
         if not user:
             return await ctx.send(f'No user {search} found')
-        return await ctx.send(f'```{repr(user)}```')
+        return await ctx.send(f'```{user.pretty_repr()}```')
 
     @commands.command(name='logs', brief='Get bot logs')
     async def get_logs(self, ctx, lines: int = 10):
