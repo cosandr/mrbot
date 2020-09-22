@@ -1,10 +1,16 @@
-from typing import Tuple
+from __future__ import annotations
+
+from typing import Tuple, Union, Optional, List
 
 import asyncpg
 import discord
+from discord.ext import commands
+
+from mrbot import MrBot
+from .base import Common
 
 
-class Guild:
+class Guild(Common):
     psql_table_name = 'guilds'
     psql_table = f"""
         CREATE TABLE IF NOT EXISTS {psql_table_name} (
@@ -17,29 +23,6 @@ class Guild:
     def __init__(self, id_: int, name: str = None):
         self.id: int = id_
         self.name: str = name
-
-    def __eq__(self, other):
-        if not isinstance(other, Guild):
-            return False
-        return (self.id == other.id and
-                self.name == other.name)
-
-    def __str__(self):
-        if self.name:
-            return self.name
-        return ''
-
-    def __repr__(self):
-        name = 'UNKNOWN'
-        if self.name:
-            name = self.name
-        return f'{name} [{self.id}]'
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-        }
 
     def to_psql(self) -> Tuple[str, list]:
         """Returns a query in the form (id, name, ...) VALUES ($1,$2, ...) and its arguments"""
@@ -61,8 +44,11 @@ class Guild:
             q += f' WHERE {where}'
         return q
 
+    def to_discord(self, bot: Union[MrBot, commands.Bot]) -> discord.Guild:
+        return bot.get_guild(self.id)
+
     @classmethod
-    def from_discord(cls, guild: discord.Guild):
+    def from_discord(cls, guild: discord.Guild) -> Optional[Guild]:
         if not guild:
             return None
         return cls(
@@ -71,7 +57,7 @@ class Guild:
         )
 
     @classmethod
-    def from_psql_res(cls, res: asyncpg.Record, prefix: str = ''):
+    def from_psql_res(cls, res: asyncpg.Record, prefix: str = '') -> Optional[Guild]:
         if not res.get(f'{prefix}id', None):
             return None
         return cls(
@@ -80,7 +66,7 @@ class Guild:
         )
 
     @classmethod
-    async def from_psql_all(cls, con: asyncpg.Connection, **kwargs):
+    async def from_psql_all(cls, con: asyncpg.Connection, **kwargs) -> List[Guild]:
         """Returns all guilds from PSQL, kwargs passed to make_psql_query"""
         results = await con.fetch(cls.make_psql_query(**kwargs))
         guilds = []

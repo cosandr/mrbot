@@ -231,6 +231,45 @@ class InternalTests(unittest.TestCase):
         async with self.bot.pool.acquire() as con:
             u = await User.from_id(self.bot, user_id=user_id, guild_id=guild_id)
 
+    def test_user_eq(self):
+        u1 = User(100, name='User 1')
+        u2 = User(100, name='User 1')
+        self.assertEqual(u1, u2)
+        dt = datetime.utcnow()
+        dt_later = dt + timedelta(seconds=10)
+        u1 = User(100, name='User', online=dt, offline=dt_later)
+        u2 = User(100, name='User', online=dt, offline=dt_later)
+        self.assertEqual(u1, u2)
+        u1 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
+                  avatar='avatar', online=datetime(2020, 9, 11, 22, 40),
+                  offline=datetime(2020, 9, 11, 22, 40), activity='activity', mobile=False)
+        u2 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
+                  avatar='avatar', online=datetime(2020, 9, 11, 22, 40),
+                  offline=datetime(2020, 9, 11, 22, 40), activity='activity', mobile=False)
+        self.assertEqual(u1, u2)
+        u2 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
+                  avatar='avatar', online=datetime(2020, 9, 11, 22, 41),
+                  offline=datetime(2020, 9, 11, 22, 40), activity='activity', mobile=False)
+        self.assertNotEqual(u1, u2)
+        u2 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
+                  avatar='avatar', online=datetime(2020, 9, 11, 22, 40),
+                  offline=datetime(2020, 9, 11, 22, 41), activity='activity', mobile=False)
+        self.assertNotEqual(u1, u2)
+
+    def test_user_diff(self):
+        u1 = User(100, name='User 1')
+        u2 = User(100, name='User 2')
+        self.assertEqual(u1.diff(u2), ['name'])
+        dt = datetime.utcnow()
+        dt_later = dt + timedelta(seconds=10)
+        u1 = User(100, name='User', online=dt, offline=dt_later)
+        u2 = User(100, name='User', online=dt, offline=dt_later)
+        self.assertEqual(u1.diff(u2), [])
+        u2 = User(100, name='User', online=dt_later, offline=dt_later)
+        self.assertEqual(u1.diff(u2), ['online'])
+        u2 = User(100, name='User')
+        self.assertEqual(u1.diff(u2), ['online', 'offline'])
+
     def test_jump_url_from_psql(self):
         self.loop.run_until_complete(self._test_jump_url_from_psql())
 

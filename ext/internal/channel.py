@@ -1,12 +1,17 @@
-from typing import Tuple
+from __future__ import annotations
+
+from typing import Tuple, Union, List, Optional
 
 import asyncpg
 import discord
+from discord.ext import commands
 
+from mrbot import MrBot
+from .base import Common
 from .guild import Guild
 
 
-class Channel:
+class Channel(Common):
     psql_table_name = 'channels'
     psql_table = f"""
         CREATE TABLE IF NOT EXISTS {psql_table_name} (
@@ -25,37 +30,11 @@ class Channel:
         self.guild: Guild = guild
         self.voice: bool = voice
 
-    def __eq__(self, other):
-        if not isinstance(other, Channel):
-            return False
-        return (self.id == other.id and
-                self.name == other.name and
-                self.guild == other.guild and
-                self.voice == other.voice)
-
     @property
     def guild_id(self):
         if not self.guild:
             return None
         return self.guild.id
-
-    def __str__(self):
-        if self.name:
-            return self.name
-        return ''
-
-    def __repr__(self):
-        name = 'UNKNOWN'
-        if self.name:
-            name = self.name
-        return f'{name} [{self.id}] Voice? {self.voice}\nGuild: {repr(self.guild)}'
-
-    def to_dict(self):
-        return dict(
-            id=self.id,
-            name=self.name,
-            voice=self.voice,
-        )
 
     def to_psql(self) -> Tuple[str, list]:
         """Returns a query in the form (id, name, ...) VALUES ($1,$2, ...) ON CONFLICT ... and its arguments"""
@@ -64,6 +43,9 @@ class Channel:
              'ON CONFLICT (id) DO UPDATE SET name=$2')
         q_args = [self.id, self.name, self.guild_id, self.voice]
         return q, q_args
+
+    def to_discord(self, bot: Union[MrBot, commands.Bot]) -> Union[discord.abc.GuildChannel, discord.abc.PrivateChannel]:
+        return bot.get_channel(self.id)
 
     @classmethod
     def from_discord(cls, channel):
@@ -96,7 +78,7 @@ class Channel:
         return q
 
     @classmethod
-    def from_psql_res(cls, res: asyncpg.Record, prefix: str = ''):
+    def from_psql_res(cls, res: asyncpg.Record, prefix: str = '') -> Optional[Channel]:
         if not res.get(f'{prefix}id', None):
             return None
         guild = None
@@ -110,7 +92,7 @@ class Channel:
         )
 
     @classmethod
-    async def from_psql_all(cls, con: asyncpg.Connection, **kwargs):
+    async def from_psql_all(cls, con: asyncpg.Connection, **kwargs) -> List[Channel]:
         """Returns all channels from PSQL, kwargs passed to make_psql_query"""
         results = await con.fetch(cls.make_psql_query(**kwargs))
         channels = []

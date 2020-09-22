@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from datetime import datetime
 from typing import Union, Tuple, List, Optional, Dict
@@ -5,14 +7,12 @@ from typing import Union, Tuple, List, Optional, Dict
 import asyncpg
 import discord
 from discord.ext import commands
-from jellyfish import jaro_winkler_similarity
 
-from mrbot import MrBot
 from ext.utils import re_id, find_closest_match
+from mrbot import MrBot
+from .base import Common
 from .guild import Guild
 
-# Tolerance for online/offline times, in seconds
-time_tolerance = 30
 instance_check = commands.Bot
 if os.getenv('IS_TEST', False):
     from test.mock_bot import TestBot
@@ -20,7 +20,7 @@ if os.getenv('IS_TEST', False):
     instance_check = (commands.Bot, TestBot)
 
 
-class User:
+class User(Common):
     psql_table_name = 'users'
     psql_table_name_nicks = 'user_nicks'
     psql_table_name_activity_log = 'user_activity_log'
@@ -75,69 +75,6 @@ class User:
         self.offline: datetime = offline
         self.activity: str = activity
         self.mobile: bool = mobile
-
-    def __eq__(self, other):
-        """Does not check all_nicks
-        Online/offline have a tolerance setting
-        Similar activities are considered equal"""
-        if not isinstance(other, User):
-            return False
-        # Check times
-        times_ok = True
-        # Accept all being None
-        for chk in (self.online, self.offline, other.online, other.offline):
-            if chk is not None:
-                times_ok = False
-                break
-        if not times_ok:
-            # Remains false if one of them is None, same for offline times
-            if isinstance(self.online, datetime) and isinstance(other.online, datetime):
-                time_diff = self.online - other.online
-                if abs(time_diff.total_seconds()) <= time_tolerance:
-                    times_ok = True
-            if isinstance(self.offline, datetime) and isinstance(other.offline, datetime):
-                time_diff = self.offline - other.offline
-                if abs(time_diff.total_seconds()) <= time_tolerance:
-                    times_ok = True
-        activity_ok = True
-        # Compare activities and consider them equal if they are very similar
-        if isinstance(self.activity, str) and isinstance(other.activity, str):
-            activity_ok = jaro_winkler_similarity(self.activity, other.activity) > 0.9
-        elif self.activity != other.activity:
-            activity_ok = False
-        return (self.id == other.id and
-                self.name == other.name and
-                self.discriminator == other.discriminator and
-                self.avatar == other.avatar and
-                self.mobile == other.mobile and
-                times_ok is True and
-                activity_ok is True)
-
-    def __str__(self):
-        if self.name:
-            return self.name
-        return ''
-
-    def __repr__(self):
-        name = 'UNKNOWN'
-        status = ''
-        if self.name:
-            name = self.name
-            if self.discriminator:
-                name += f'#{self.discriminator}'
-            if self.all_nicks_str:
-                name += f' ({self.all_nicks_str})'
-        elif self.all_nicks_str:
-            name = self.all_nicks_str
-        if self.online:
-            status += f'Online at {self.online}\n'
-        if self.offline:
-            status += f'Offline at {self.offline}\n'
-        if self.activity:
-            status += f'Activity: {self.activity}\n'
-        if status:
-            return f'{name} [{self.id}], mobile? {self.mobile}\n{status}'
-        return f'{name} [{self.id}], mobile? {self.mobile}'
 
     def get_nick(self, guild_id: int):
         """Returns first nick, or empty string if it doesn't exist"""
@@ -273,7 +210,7 @@ class User:
         return q
 
     @classmethod
-    def from_search_discord_users(cls, search_name: str, users: List[Union[discord.User, discord.Member]]):
+    def from_search_discord_users(cls, search_name: str, users: List[Union[discord.User, discord.Member]]) -> Optional[User]:
         """Returns the closest match in a list of discord Users"""
         similarities = {}
         for i in range(len(users)):
@@ -294,7 +231,8 @@ class User:
         return None
 
     @classmethod
-    async def from_search(cls, ctx: Union[MrBot, commands.Context], search: Union[int, str], guild_id: int = None, **kwargs):
+    async def from_search(cls, ctx: Union[MrBot, commands.Context], search: Union[int, str],
+                          guild_id: int = None, **kwargs) -> Optional[User]:
         """Look for user with a name/nickname similar to search, if search is ID look for that instead"""
         search_id: int = 0
         search_user: str = ''
@@ -340,7 +278,8 @@ class User:
         return None
 
     @classmethod
-    async def from_id(cls, ctx: Union[MrBot, commands.Context], user_id: int, guild_id: int = None, **kwargs):
+    async def from_id(cls, ctx: Union[MrBot, commands.Context], user_id: int,
+                      guild_id: int = None, **kwargs) -> Optional[User]:
         bot, _, guild_id = cls._split_ctx(ctx, guild_id=guild_id)
         # Check cache
         d_user = bot.get_user(user_id)
@@ -364,7 +303,7 @@ class User:
         return cls.from_discord(d_user)
 
     @classmethod
-    def from_discord(cls, user: Union[discord.User, discord.Member]):
+    def from_discord(cls, user: Union[discord.User, discord.Member]) -> Optional[User]:
         all_nicks = {}
         activity = None
         mobile = False
@@ -376,7 +315,7 @@ class User:
         return cls(
             id_=user.id,
             name=user.name,
-            discriminator=user.discriminator,
+            discriminator=int(user.discriminator),
             all_nicks=all_nicks,
             avatar=user.avatar,
             activity=activity,
@@ -384,7 +323,7 @@ class User:
         )
 
     @classmethod
-    def from_psql_res(cls, res: asyncpg.Record, prefix: str = ''):
+    def from_psql_res(cls, res: asyncpg.Record, prefix: str = '') -> Optional[User]:
         if not res.get(f'{prefix}id', None):
             return None
         all_nicks = {}
@@ -415,7 +354,7 @@ class User:
         )
 
     @classmethod
-    async def from_psql_all(cls, con: asyncpg.Connection, guild_id=None, **kwargs):
+    async def from_psql_all(cls, con: asyncpg.Connection, guild_id=None, **kwargs) -> List[User]:
         """Returns all users from PSQL, kwargs passed to make_psql_query"""
         if guild_id is not None and 'with_nick' in kwargs:
             results = await con.fetch(cls.make_psql_query(**kwargs), guild_id)

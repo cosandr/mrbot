@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import time
 from datetime import datetime, timezone
@@ -8,14 +10,15 @@ import discord
 from discord.ext import commands
 
 import config as cfg
-from mrbot import MrBot
 from ext.utils import get_url, re_id, find_similar_str
+from mrbot import MrBot
+from .base import Common
 from .channel import Channel
 from .guild import Guild
 from .user import User
 
 
-class Message:
+class Message(Common):
     psql_table_name = 'messages'
     psql_table_name_edits = 'message_edits'
     psql_table = f"""
@@ -75,35 +78,8 @@ class Message:
         self.channel: Channel = channel
         self.guild: Guild = guild
 
-    def __eq__(self, other):
-        if not isinstance(other, Message):
-            return False
-        return (self.id == other.id and
-                self.time == other.time and
-                self.content == other.content and
-                self.attachments == other.attachments and
-                self.embed == other.embed and
-                self.edits == other.edits and
-                self.author == other.author and
-                self.channel == other.channel and
-                self.guild == other.guild)
-
     def __str__(self):
         return self.content
-
-    def __repr__(self):
-        author = 'UNKNOWN'
-        channel = 'UNKNOWN'
-        guild = 'UNKNOWN'
-        if self.author:
-            author = f'{self.author.display_name} [{self.author.id}]'
-        if self.channel:
-            channel = f'{self.channel.name} [{self.channel.id}]'
-        if self.guild:
-            guild = f'{self.guild.name} [{self.guild.id}]'
-        return (f'Sent by {author} at {self.time_str} [{self.id}]\n'
-                f'Channel: {channel} Guild: {guild}\n'
-                f'{self.content}\n{self.extra}')
 
     @property
     def urls(self):
@@ -265,8 +241,7 @@ class Message:
     async def to_discord(self, bot: Union[MrBot, commands.Bot]) -> Optional[discord.Message]:
         """Returns a discord.Message, if it exists"""
         # Check internal cache
-        # noinspection PyProtectedMember
-        for msg in bot._connection._messages:
+        for msg in bot.cached_messages:
             if msg.id == self.id:
                 return msg
         # Fetch from API
@@ -299,7 +274,7 @@ class Message:
         return await msg.to_discord(bot)
 
     @classmethod
-    async def from_user_id(cls, ctx: Union[MrBot, commands.Context], user_id: int, ch_id: int = None, **kwargs):
+    async def from_user_id(cls, ctx: Union[MrBot, commands.Context], user_id: int, ch_id: int = None, **kwargs) -> Optional[Message]:
         """Attempt to return the last message sent by user ID
         :param ctx: Context or Bot instance, ch_id must be provided in order to fetch from API using a Bot
         :param user_id: ID of the user we're interested in
@@ -309,8 +284,7 @@ class Message:
         """
         bot, channel, ch_id = cls._split_ctx(ctx, ch_id)
         # Check internal cache
-        # noinspection PyProtectedMember
-        for msg in bot._connection._messages:
+        for msg in bot.cached_messages:
             if msg.author.id == user_id:
                 if ch_id:
                     if ch_id == msg.channel.id:
@@ -337,7 +311,7 @@ class Message:
         return None
 
     @classmethod
-    async def from_id(cls, ctx: Union[MrBot, commands.Context], msg_id: int, ch_id: int = None, **kwargs):
+    async def from_id(cls, ctx: Union[MrBot, commands.Context], msg_id: int, ch_id: int = None, **kwargs) -> Optional[Message]:
         """Attempt to return the Message with given ID
 
         :param ctx: Context or Bot instance, ch_id must be provided in order to fetch from API using a Bot
@@ -348,8 +322,7 @@ class Message:
         """
         bot, channel, ch_id = cls._split_ctx(ctx, ch_id)
         # Check internal cache
-        # noinspection PyProtectedMember
-        for msg in bot._connection._messages:
+        for msg in bot.cached_messages:
             if msg.id == msg_id:
                 return cls.from_discord(msg)
         # Check PSQL
@@ -367,7 +340,7 @@ class Message:
             return None
 
     @classmethod
-    def from_discord(cls, msg: discord.Message):
+    def from_discord(cls, msg: discord.Message) -> Optional[Message]:
         attachments = []
         for att in msg.attachments:
             if isinstance(att.url, str):
@@ -406,7 +379,7 @@ class Message:
 
     @classmethod
     async def with_url(cls, ctx: Union[MrBot, commands.Context], search: Union[None, int, str] = None, ch_id: int = None,
-                       img_only: bool = False, skip_id: Optional[int] = None):
+                       img_only: bool = False, skip_id: Optional[int] = None) -> Optional[Message]:
         """Look for a message with a URL in it
 
         :param ctx: Context or Bot instance, ch_id must be provided in order to fetch from API using a Bot
@@ -459,8 +432,7 @@ class Message:
                 return True
             return False
 
-        # noinspection PyProtectedMember
-        for d_msg in bot._connection._messages:
+        for d_msg in bot.cached_messages:
             if d_msg.channel.id == ch_id:
                 msg = cls.from_discord(d_msg)
                 if valid_msg_check(msg):
@@ -508,7 +480,7 @@ class Message:
         return q
 
     @classmethod
-    async def from_psql_res(cls, res: asyncpg.Record, con: asyncpg.Connection = None, with_edits=False):
+    async def from_psql_res(cls, res: asyncpg.Record, con: asyncpg.Connection = None, with_edits=False) -> Optional[Message]:
         """Return a message from PSQL query result (such as from make_psql_query)
         Includes edited history if con and with_edits are provided"""
         if not res:
@@ -544,7 +516,7 @@ class Message:
         )
 
     @classmethod
-    async def from_psql(cls, con: asyncpg.Connection, msg_id: int, with_edits=False, **kwargs):
+    async def from_psql(cls, con: asyncpg.Connection, msg_id: int, with_edits=False, **kwargs) -> Optional[Message]:
         """Return Message from PSQL with given ID"""
         q = cls.make_psql_query(where='m.msg_id=$1', **kwargs)
         res = await con.fetchrow(q, msg_id)
