@@ -25,7 +25,7 @@ class Test:
         # await self.clear_tables(self.bot.pool, drop=True)
         # await self.create_all_tables()
         # await self.copy_tables(num_cons=24, max_elem=1000)
-        q = f'{User.make_psql_query(with_all_nicks=True)} LIMIT 1'
+        q = f'{User.make_psql_query(with_activity=True, with_all_nicks=True, with_status=True)} LIMIT 1'
         r = await self.bot.pool.fetchrow(q)
         u = User.from_psql_res(r)
         print(repr(u))

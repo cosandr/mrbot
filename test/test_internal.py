@@ -155,40 +155,6 @@ class InternalTests(unittest.TestCase):
             print(f'Expected: {repr(u)}\nGot{repr(psql_u)}')
         self.assertFalse(failed)
 
-    def test_user_times(self):
-        same_dt = datetime.utcnow()
-        same_later_dt = same_dt + timedelta(seconds=10)
-        diff_dt = same_dt + timedelta(seconds=40)
-        same_users = [
-            User(id_=1, online=None, offline=None),
-            User(id_=1, online=None, offline=None),
-            User(id_=1, online=same_dt, offline=None),
-            User(id_=1, online=same_dt, offline=None),
-            User(id_=1, online=None, offline=same_dt),
-            User(id_=1, online=None, offline=same_dt),
-        ]
-        for online in (True, False):
-            for dt in (same_dt, same_later_dt):
-                if online:
-                    same_users.append(User(id_=1, online=dt, offline=None))
-                else:
-                    same_users.append(User(id_=1, online=None, offline=dt))
-        for i in range(0, len(same_users)-1, 2):
-            self.assertEqual(same_users[i], same_users[i+1])
-        diff_users = []
-        dt_one = (None, same_dt, diff_dt)
-        dt_two = (same_dt, None, same_dt)
-        for online in (True, False):
-            for i in range(len(dt_one)):
-                if online:
-                    diff_users.append(User(id_=1, online=dt_one[i], offline=None))
-                    diff_users.append(User(id_=1, online=dt_two[i], offline=None))
-                else:
-                    diff_users.append(User(id_=1, online=None, offline=dt_one[i]))
-                    diff_users.append(User(id_=1, online=None, offline=dt_two[i]))
-        for i in range(0, len(diff_users)-1, 2):
-            self.assertNotEqual(diff_users[i], diff_users[i+1])
-
     def test_user_from_search(self):
         self.loop.run_until_complete(self._test_user_from_search())
 
@@ -236,39 +202,40 @@ class InternalTests(unittest.TestCase):
         u2 = User(100, name='User 1')
         self.assertEqual(u1, u2)
         dt = datetime.utcnow()
-        dt_later = dt + timedelta(seconds=10)
-        u1 = User(100, name='User', online=dt, offline=dt_later)
-        u2 = User(100, name='User', online=dt, offline=dt_later)
+        u1 = User(100, name='User', status_time=dt, online=True)
+        u2 = User(100, name='User', status_time=dt, online=True)
         self.assertEqual(u1, u2)
-        u1 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
-                  avatar='avatar', online=datetime(2020, 9, 11, 22, 40),
-                  offline=datetime(2020, 9, 11, 22, 40), activity='activity', mobile=False)
-        u2 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
-                  avatar='avatar', online=datetime(2020, 9, 11, 22, 40),
-                  offline=datetime(2020, 9, 11, 22, 40), activity='activity', mobile=False)
+        u1 = User(id_=111, name='User', discriminator=1, avatar='avatar', all_nicks={101: 'nick'},
+                  activity='activity', activity_time=datetime(2020, 9, 11, 22, 40),
+                  online=True, mobile=False, status_time=datetime(2020, 9, 11, 22, 40))
+        u2 = User(id_=111, name='User', discriminator=1, avatar='avatar', all_nicks={101: 'nick'},
+                  activity='activity', activity_time=datetime(2020, 9, 11, 22, 40),
+                  online=True, mobile=False, status_time=datetime(2020, 9, 11, 22, 40))
         self.assertEqual(u1, u2)
-        u2 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
-                  avatar='avatar', online=datetime(2020, 9, 11, 22, 41),
-                  offline=datetime(2020, 9, 11, 22, 40), activity='activity', mobile=False)
+        u2 = User(id_=111, name='User', discriminator=1, avatar='avatar', all_nicks={101: 'nick'},
+                  activity='activity', activity_time=datetime(2020, 9, 11, 22, 50),
+                  online=True, mobile=False, status_time=datetime(2020, 9, 11, 22, 40))
         self.assertNotEqual(u1, u2)
-        u2 = User(id_=111, name='User', discriminator=1, all_nicks={101: 'Nick 101'},
-                  avatar='avatar', online=datetime(2020, 9, 11, 22, 40),
-                  offline=datetime(2020, 9, 11, 22, 41), activity='activity', mobile=False)
+        u2 = User(id_=111, name='User', discriminator=1, avatar='avatar', all_nicks={101: 'nick'},
+                  activity='activity', activity_time=datetime(2020, 9, 11, 22, 40),
+                  online=True, mobile=False, status_time=datetime(2020, 9, 11, 22, 50))
         self.assertNotEqual(u1, u2)
 
     def test_user_diff(self):
         u1 = User(100, name='User 1')
         u2 = User(100, name='User 2')
-        self.assertEqual(u1.diff(u2), ['name'])
+        self.assertSetEqual(u1.diff(u2), {'name'})
         dt = datetime.utcnow()
         dt_later = dt + timedelta(seconds=10)
-        u1 = User(100, name='User', online=dt, offline=dt_later)
-        u2 = User(100, name='User', online=dt, offline=dt_later)
-        self.assertEqual(u1.diff(u2), [])
-        u2 = User(100, name='User', online=dt_later, offline=dt_later)
-        self.assertEqual(u1.diff(u2), ['online'])
+        u1 = User(100, name='User', status_time=dt, online=True)
+        u2 = User(100, name='User', status_time=dt, online=True)
+        self.assertSetEqual(u1.diff(u2), set())
+        u1 = User(100, name='User', status_time=dt, online=True)
+        u2 = User(100, name='User', status_time=dt_later, online=True)
+        self.assertSetEqual(u1.diff(u2), {'status_time'})
+        u1 = User(100, name='User', status_time=dt, online=True)
         u2 = User(100, name='User')
-        self.assertEqual(u1.diff(u2), ['online', 'offline'])
+        self.assertSetEqual(u1.diff(u2), {'online', 'status_time'})
 
     def test_jump_url_from_psql(self):
         self.loop.run_until_complete(self._test_jump_url_from_psql())
