@@ -11,6 +11,43 @@ class Generic(NamedTuple):
     value: str
 
 
+class BaseConfig:
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        for k, v in vars(self).items():
+            if v != getattr(other, k):
+                return False
+        return True
+
+    def __repr__(self):
+        attrs = []
+        for k, v in vars(self).items():
+            name = k
+            # Remove leading _, we probably have a setter
+            if name[0] == '_':
+                name = name[1:]
+            # Replace id with id_
+            elif name == 'id':
+                name = 'id_'
+            attrs.append(f'{name}={repr(v)}')
+        return f'{self.__class__.__name__}({", ".join(attrs)})'
+
+    def pretty_repr(self, _level=0):
+        attrs = []
+        for k, v in vars(self).items():
+            name = k
+            if name[0] == '_':
+                name = name[1:]
+            # Always show booleans, but ignore empty lists, dicts, None etc
+            if isinstance(v, bool) or v:
+                if func := getattr(v, "pretty_repr", None):
+                    attrs.append(f'{" " * _level * 2}{name}:\n{func(_level+1)}')
+                else:
+                    attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
+        return "\n".join(attrs)
+
+
 class DefaultPermissions:
     """Some default PermissionOverwrite's"""
     @staticmethod
@@ -51,16 +88,11 @@ class DefaultPermissions:
         )
 
 
-class RoleDef:
+class RoleDef(BaseConfig):
     """Role definition for guild.json"""
     def __init__(self, name, **kwargs):
         self.name: str = name
         self.permission_overwrite = discord.PermissionOverwrite(**kwargs)
-
-    def __eq__(self, other):
-        if not isinstance(other, RoleDef):
-            return False
-        return self.name == other.name and self.permission_overwrite == other.permission_overwrite
 
     def to_dict(self) -> dict:
         ret = {self.name: {}}
@@ -81,7 +113,7 @@ class RoleDef:
         return perms
 
 
-class MemberDef:
+class MemberDef(BaseConfig):
     """Member definition for guild.json"""
     def __init__(self, id_, name, self_role=False, roles=None):
         self.id: int = id_
@@ -92,14 +124,8 @@ class MemberDef:
         if self.roles and not isinstance(self.roles, list):
             self.roles = [self.roles]
 
-    def __eq__(self, other):
-        if not isinstance(other, MemberDef):
-            return False
-        return (self.id == other.id and self.name == other.name and
-                self.self_role == other.self_role and self.roles == other.roles)
 
-
-class TextChannelDef:
+class TextChannelDef(BaseConfig):
     """Text channel definition for guild.json"""
     def __init__(self, name, roles=None, member_names=None, member_ids=None, read_only=False):
         self.name: str = name
@@ -115,15 +141,8 @@ class TextChannelDef:
         if self.member_ids and not isinstance(self.member_ids, list):
             self.member_ids = [self.member_ids]
 
-    def __eq__(self, other):
-        if not isinstance(other, TextChannelDef):
-            return False
-        return (self.name == other.name and self.read_only == other.read_only and
-                self.member_names == other.member_names and self.roles == other.roles and
-                self.member_ids == other.member_ids)
 
-
-class GuildDef:
+class GuildDef(BaseConfig):
     """Overall definition for guild.json"""
     def __init__(self, id_, name='', members=None, text_channels=None, roles=None):
         self.id: int = id_
@@ -131,12 +150,6 @@ class GuildDef:
         self.members: Dict[int, MemberDef] = members
         self.text_channels: Dict[str, TextChannelDef] = text_channels
         self.roles: Dict[str, RoleDef] = roles
-
-    def __eq__(self, other):
-        if not isinstance(other, GuildDef):
-            return False
-        return (self.id == other.id and self.name == other.name and self.members == other.members and
-                self.text_channels == other.text_channels and self.roles == other.roles)
 
     def find_user_name(self, name: str) -> Optional[MemberDef]:
         """Find a member definition by name"""
@@ -182,7 +195,7 @@ class GuildDef:
         return cls.from_dict(data=data)
 
 
-class PostgresConfig:
+class PostgresConfig(BaseConfig):
     def __init__(self):
         self.main: str = ''
         self.public: str = ''
@@ -190,7 +203,7 @@ class PostgresConfig:
         self.live: str = ''
 
 
-class BotConfig:
+class BotConfig(BaseConfig):
     """Global bot config, will not start without most of it"""
     psql_table_name = 'bot_config'
     psql_table = f"""
