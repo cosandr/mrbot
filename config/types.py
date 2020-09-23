@@ -180,26 +180,72 @@ class GuildDef:
         return cls.from_dict(data=data)
 
 
+class PostgresConfig:
+    def __init__(self):
+        self.main: str = ''
+        self.public: str = ''
+        self.web: str = ''
+        self.live: str = ''
+
+
 class BotConfig:
     """Global bot config, will not start without most of it"""
-    def __init__(self, token, psql, data='', upload='', brains='',
-                 hostname='', approved_guilds=None, secrets=None, guilds=None):
+
+    def __init__(self, token, psql, api_keys=None, approved_guilds=None, brains='',
+                 data='', guilds=None, hostname='', upload=''):
         self.token: str = token
-        self.psql: str = psql
-        self.data: str = data
-        self.upload: str = upload
+        self.psql: PostgresConfig = psql
+        self.api_keys: dict = api_keys or dict()
+        self.approved_guilds: List[int] = approved_guilds or []
         self.brains: str = brains
+        self.data: str = data
+        self.guilds: Dict[int, GuildDef] = guilds or {}
         self.hostname: str = hostname
-        self.approved_guilds: List[int] = approved_guilds
-        self.guilds: Dict[int, GuildDef] = guilds
-        # List of data read from the JSON file(s)
-        self.secrets: List[dict] = secrets
+        self.upload: str = upload
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Read all from single dict"""
+        kwargs = dict(psql=PostgresConfig(), api_keys={}, approved_guilds=[], guilds={})
+
+        for d in data.get('secrets', []):
+            if v := d.get('token'):
+                kwargs['token'] = v
+            if v := d.get('psql'):
+                for name, dsn in v.items():
+                    setattr(kwargs['psql'], name, dsn)
+            if v := d.get('approved_guilds'):
+                kwargs['approved_guilds'] += v
+            for name, val in d.get('api-keys', {}).items():
+                kwargs['api_keys'][name] = val
+
+        for d in data.get('paths', []):
+            if v := d.get('data'):
+                kwargs['data'] = v
+            if v := d.get('upload'):
+                kwargs['upload'] = v
+            if v := d.get('brains'):
+                kwargs['brains'] = v
+            if v := d.get('hostname'):
+                kwargs['hostname'] = v
+
+        for d in data.get('guilds', []):
+            g = GuildDef.from_dict(d)
+            kwargs['guilds'][g.id] = g
+
+        if not kwargs.get('token'):
+            raise RuntimeError('Token not found in config')
+
+        if not kwargs['psql'].main:
+            raise RuntimeError('DSN for main PostgreSQL connection was not found')
+
+        return cls(**kwargs)
 
     @classmethod
     def from_json(cls, secrets: Union[str, List[str]], paths: Union[str, List[str]],
                   guilds: Union[str, List[str]] = None):
         """Read secrets and paths JSON files, later data overrides previous data"""
-        kwargs = dict(secrets=[], approved_guilds=[], guilds={})
+        all_dict = dict(secrets=[], paths=[], guilds=[])
         if isinstance(secrets, str):
             secrets = [secrets]
         if isinstance(paths, str):
@@ -212,28 +258,16 @@ class BotConfig:
         for file_name in secrets:
             with open(file_name, 'r') as f:
                 data: dict = json.load(f)
-            kwargs['secrets'].append(data)
-            if v := data.get('token'):
-                kwargs['token'] = v
-            if data.get('psql') and data['psql'].get('main'):
-                kwargs['psql'] = data['psql']['main']
-            if v := data.get('approved_guilds'):
-                kwargs['approved_guilds'] += v
+            all_dict['secrets'].append(data)
 
         for file_name in paths:
             with open(file_name, 'r') as f:
                 data: dict = json.load(f)
-            if v := data.get('data'):
-                kwargs['data'] = v
-            if v := data.get('upload'):
-                kwargs['upload'] = v
-            if v := data.get('brains'):
-                kwargs['brains'] = v
-            if v := data.get('hostname'):
-                kwargs['hostname'] = v
+            all_dict['paths'].append(data)
 
         for file_name in guilds:
-            g = GuildDef.from_json(file_name)
-            kwargs['guilds'][g.id] = g
+            with open(file_name, 'r') as f:
+                data: dict = json.load(f)
+            all_dict['guilds'].append(data)
 
-        return cls(**kwargs)
+        return cls.from_dict(all_dict)

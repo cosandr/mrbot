@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import re
-from contextlib import asynccontextmanager
 from time import perf_counter
 from traceback import print_exception
 from typing import Union, Iterable
@@ -53,16 +52,6 @@ async def create_table(con: Union[asyncpg.pool.Pool, asyncpg.Connection], name: 
         logger.debug(status)
     else:
         print(status)
-
-
-@asynccontextmanager
-async def pg_connection(dsn: str):
-    """Async context manager for PSQL database connection"""
-    con = await asyncpg.connect(dsn=dsn)
-    try:
-        yield con
-    finally:
-        await con.close()
 
 
 async def try_run_query(con: asyncpg.Connection, q: str, q_args: Iterable, logger: logging.Logger, msg: Message = None,

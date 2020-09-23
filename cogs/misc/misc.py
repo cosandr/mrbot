@@ -7,6 +7,7 @@ import random
 import re
 import time
 import traceback
+import unicodedata
 import uuid
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -16,7 +17,6 @@ import asyncpg
 import discord
 import matplotlib.pyplot as plt
 import numpy as np
-import unicodedata
 import wolframalpha
 from discord.ext import commands
 from jellyfish import jaro_winkler_similarity
@@ -25,13 +25,13 @@ from sympy import preview
 
 import config as cfg
 import ext.embed_helpers as emh
-from mrbot import MrBot
 from ext import utils
 from ext.errors import MissingConfigError
 from ext.internal import Message, User
 from ext.parsers import parsers
-from ext.psql import pg_connection, create_table
-from ext.utils import find_similar_str
+from ext.psql import create_table
+from ext.utils import find_similar_str, pg_connection
+from mrbot import MrBot
 
 
 class Misc(commands.Cog, name="Miscellaneous"):
@@ -72,15 +72,9 @@ class Misc(commands.Cog, name="Miscellaneous"):
         self.wolf_client = wolframalpha.Client(self.wolf_key)
 
     def read_config(self):
-        for s in self.bot.config.secrets:
-            if s.get('api-keys') and s['api-keys'].get('wolfram'):
-                self.wolf_key = s['api-keys']['wolfram']
-            if not s.get('psql'):
-                continue
-            if v := s['psql'].get('web'):
-                self.web_dsn = v
-            if v := s['psql'].get('public'):
-                self.pub_dsn = v
+        self.wolf_key = self.bot.config.api_keys.get('wolfram')
+        self.web_dsn = self.bot.config.psql.web
+        self.pub_dsn = self.bot.config.psql.public
         if not self.wolf_key:
             raise MissingConfigError('Wolfram Alpha API key not found')
         if not self.web_dsn:

@@ -6,8 +6,8 @@ import discord
 from discord.ext import commands
 
 import ext.embed_helpers as emh
-from mrbot import MrBot
 from ext.errors import MissingConfigError
+from mrbot import MrBot
 from .checks import connect_voice_check, is_voice_check
 from .youtube import YouTube, get_stream_url
 
@@ -35,9 +35,7 @@ class Music(commands.Cog, name="YouTube Music"):
         self.bot.loop.create_task(self.async_load())
 
     def read_config(self):
-        for s in self.bot.config.secrets:
-            if s.get('api-keys') and s['api-keys'].get('google'):
-                self.api_key = s['api-keys']['google']
+        self.api_key = self.bot.config.api_keys.get('google')
         if not self.api_key:
             raise MissingConfigError('Google API key not found')
 

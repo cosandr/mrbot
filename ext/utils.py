@@ -1,17 +1,30 @@
+import math
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
-from typing import Sequence, Optional, Union, List, Tuple
+from typing import Sequence, Optional, List, Tuple
+from typing import Union
 
+import asyncpg
 import discord
-import math
 from aiohttp import ClientSession
 from jellyfish import jaro_winkler_similarity
 
 re_url = re.compile(r'https?://\S+', re.IGNORECASE)
 re_img_url = re.compile(r'https?://\S+(\.png|\.jpg|\.jpeg)', re.IGNORECASE)
 re_id = re.compile(r'\d{18}')
+
+
+@asynccontextmanager
+async def pg_connection(dsn: str):
+    """Async context manager for PSQL database connection"""
+    con = await asyncpg.connect(dsn=dsn)
+    try:
+        yield con
+    finally:
+        await con.close()
 
 
 def cleanup_http_params(params: dict, remove_none=True) -> dict:

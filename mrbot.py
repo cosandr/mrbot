@@ -78,7 +78,7 @@ class MrBot(commands.Bot):
 
     async def connect_sess(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
-        self.pool = await asyncpg.create_pool(dsn=self.config.psql)
+        self.pool = await asyncpg.create_pool(dsn=self.config.psql.main)
         # noinspection PyProtectedMember
         self.logger.info(f"Pool connected to database `{self.pool._working_params.database}`.")
         self.aio_sess = ClientSession()

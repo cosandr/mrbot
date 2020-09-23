@@ -5,8 +5,8 @@ from urllib import parse
 from discord.ext import commands
 
 import ext.embed_helpers as emh
-from mrbot import MrBot
 from ext.errors import MissingConfigError
+from mrbot import MrBot
 
 
 class Search(commands.Cog, name="Search"):
@@ -16,12 +16,9 @@ class Search(commands.Cog, name="Search"):
         self.read_config()
 
     def read_config(self):
-        for s in self.bot.config.secrets:
-            if s.get('api-keys') and s['api-keys'].get('oxford'):
-                if v := s['api-keys']['oxford'].get('app_id'):
-                    self.headers['app_id'] = v
-                if v := s['api-keys']['oxford'].get('app_key'):
-                    self.headers['app_key'] = v
+        if s := self.bot.config.api_keys.get('oxford'):
+            self.headers['app_id'] = s.get('app_id')
+            self.headers['app_key'] = s.get('app_key')
         if not self.headers['app_id']:
             raise MissingConfigError('Oxford API app ID not found')
         if not self.headers['app_key']:

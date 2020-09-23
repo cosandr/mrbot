@@ -64,16 +64,9 @@ class TestBot:
 
     async def async_init(self, con_live=False, con_pub=False):
         self.aio_sess = ClientSession()
-        self.pool = await asyncpg.create_pool(dsn=self.config.psql, max_size=32)
-        live_dsn = ''
-        public_dsn = ''
-        for s in self.config.secrets:
-            if not s.get('psql'):
-                continue
-            if v := s['psql'].get('live'):
-                live_dsn = v
-            if v := s['psql'].get('public'):
-                public_dsn = v
+        self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, max_size=32)
+        live_dsn = self.config.psql.live
+        public_dsn = self.config.psql.public
         if con_live:
             self.pool_live = await asyncpg.create_pool(dsn=live_dsn)
         if con_pub:
