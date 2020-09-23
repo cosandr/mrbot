@@ -1,5 +1,7 @@
 import asyncio
 import itertools
+import json
+import os
 import re
 
 import asyncpg
@@ -7,6 +9,7 @@ import asyncpg
 from cogs.psql_collector import Collector
 from cogs.stars import Stars
 from cogs.todo import Todo
+from config import BotConfig
 from ext.internal import Message, User
 from .mock_bot import TestBot
 from .test_plots import TestPlot
@@ -25,12 +28,31 @@ class Test:
         # await self.clear_tables(self.bot.pool, drop=True)
         # await self.create_all_tables()
         # await self.copy_tables(num_cons=24, max_elem=1000)
-        q = f'{User.make_psql_query(with_activity=True, with_all_nicks=True, with_status=True)} LIMIT 1'
-        r = await self.bot.pool.fetchrow(q)
-        u = User.from_psql_res(r)
-        print(repr(u))
-        print(u.pretty_repr())
+        # await self.insert_config_json_psql()
+        config = await BotConfig.from_psql(dsn=self.bot.config.psql.main, extra=dict(secrets=['test']))
+        print(config)
         # await self.run_plot()
+
+    async def insert_config_json_psql(self, live=False):
+        """Reads and inserts all .json files in config directory"""
+        con = self.bot.pool_live if live else self.bot.pool
+        # Ensure table exists
+        status = await con.execute(BotConfig.psql_table)
+        print(status)
+        for file in os.listdir('config'):
+            file_name, file_ext = os.path.splitext(file)
+            if file_ext != '.json':
+                continue
+            name_split = file_name.split('_', 1)
+            data_type = name_split[0]
+            name = name_split[1] if len(name_split) > 1 else 'main'
+            with open(os.path.join('config', file), 'r') as f:
+                data = json.load(f)
+            q = (f'INSERT INTO {BotConfig.psql_table_name} '
+                 '(name, type, data) VALUES ($1, $2, $3) '
+                 'ON CONFLICT (name, type) DO UPDATE SET data=$3')
+            status = await con.execute(q, name, data_type, json.dumps(data))
+            print(status)
 
     def test_emoji(self):
         from emoji import EMOJI_UNICODE

@@ -3,6 +3,8 @@ from typing import NamedTuple, List, Union, Dict, Optional
 
 import discord
 
+from ext.utils import pg_connection
+
 
 class Generic(NamedTuple):
     name: str
@@ -190,6 +192,16 @@ class PostgresConfig:
 
 class BotConfig:
     """Global bot config, will not start without most of it"""
+    psql_table_name = 'bot_config'
+    psql_table = f"""
+        CREATE TABLE IF NOT EXISTS {psql_table_name} (
+            name  VARCHAR(20) NOT NULL,
+            type  VARCHAR(10) NOT NULL,
+            data  JSONB NOT NULL,
+            UNIQUE (name, type)
+    );
+    """
+    psql_all_tables = {(psql_table_name,): psql_table}
 
     def __init__(self, token, psql, api_keys=None, approved_guilds=None, brains='',
                  data='', guilds=None, hostname='', upload=''):
@@ -240,6 +252,41 @@ class BotConfig:
             raise RuntimeError('DSN for main PostgreSQL connection was not found')
 
         return cls(**kwargs)
+
+    @classmethod
+    async def from_psql(cls, dsn: str, extra: Dict[str, List[str]] = None):
+        """Load config from PSQL table, always loads data named main and all guilds"""
+        all_dict = dict(secrets=[], paths=[], guilds=[])
+        extra = extra or dict()
+
+        def add_record(r):
+            if r['type'] == 'secrets':
+                all_dict['secrets'].append(json.loads(r['data']))
+            elif r['type'] == 'paths':
+                all_dict['paths'].append(json.loads(r['data']))
+
+        def get_record(r_list, n, t):
+            for r in r_list:
+                if r['name'] == n and r['type'] == t:
+                    return r
+            return None
+
+        async with pg_connection(dsn=dsn) as con:
+            all_rows = await con.fetch(f'SELECT * FROM {cls.psql_table_name}')
+            # Add main and guilds
+            for row in all_rows:
+                if row['name'] == 'main':
+                    add_record(row)
+                elif row['type'] == 'guild':
+                    all_dict['guilds'].append(json.loads(row['data']))
+            # Add extra
+            for r_type in ('secrets', 'paths'):
+                for name in extra.get(r_type, []):
+                    if row := get_record(all_rows, name, r_type):
+                        add_record(row)
+                    else:
+                        raise RuntimeError(f'Requested row {name} of type {r_type} not found in table `{cls.psql_table_name}`')
+        return cls.from_dict(all_dict)
 
     @classmethod
     def from_json(cls, secrets: Union[str, List[str]], paths: Union[str, List[str]],
