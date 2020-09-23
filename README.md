@@ -10,16 +10,50 @@ Running in Docker is the easiest solution, [Dockerfile](https://github.com/cosan
 Most of the CPU heavy tasks are run using its [brains API](https://github.com/cosandr/mrbot-brains).
 The bot runs without it, however none of the machine learning commands will work.
 
+Set its listening address in as the `brains` key in one of the paths config types.
+
+Check `launcher.py -h` for launch options.
+
 ## Configuration
 
-All config files go in the `config` directory.
 [config.py](config/config.py) is for general bot settings.
 
-Set its listening address in `paths.json` as the `brains` key.
+Config can be loaded from JSON files or a PSQL table.
+Launch with `json-config` or `psql-config` respectively.
 
-Config is loaded from JSON file(s), missing values will break some functions.
+The data itself is the same between the two, see below for examples.
 
-`secrets.json`
+The load order is important, loading multiple files of the same type (secrets or paths) overrides previous data.
+
+This is useful for running different instances with slightly different data, as they can share certain settings
+and not others (for example different tokens with otherwise identical configs).
+
+### PSQL config
+
+Must specify PostgreSQL connection string:
+ - Directly using `-c/--dsn`
+ - Read from the environment variable `CONFIG_DSN` using `--env`
+ - Read from file using `-f/--file`
+
+All guild definitions and entries named "main" are loaded first.
+
+Extra names may be specified by using `-e <type>:<name>` for example `-e secrets:test` will load
+the row with name `test` and type `secrets`.
+
+Examples:
+ - `./launcher.py psql-config -c 'postgres://user:password@localhost/db'`
+ - `CONFIG_DSN='postgres://user:password@localhost/db' ./launcher.py psql-config --env`
+ - `./launcher.py psql-config -f config/.dsn`
+
+
+### JSON config
+
+Must specify JSON files to load, at least one for secrets, paths and guilds.
+
+Example `./launcher.py json-config -s config/secrets.json -p config/paths.json -g config/guild.json`
+
+### Example configs
+`secrets`
 ```json
 {
     "token": "",
@@ -36,7 +70,7 @@ Config is loaded from JSON file(s), missing values will break some functions.
 }
 ```
 
-`paths.json`
+`paths`
 ```json
 {
     "data": "",
@@ -46,7 +80,7 @@ Config is loaded from JSON file(s), missing values will break some functions.
 }
 ```
 
-`guild.json`
+`guild`
 ```json
 {
     "id": 123,

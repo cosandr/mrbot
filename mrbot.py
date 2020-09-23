@@ -38,7 +38,7 @@ class MrBot(commands.Bot):
         ch.setLevel(logging.INFO)
         ch.setFormatter(logger_fmt)
         # File Handler
-        self.log_file_name = kwargs.pop('log_file_name', 'mrbot.log')
+        self.log_file_name = kwargs.pop('log_file_name', None) or 'mrbot.log'
         fh = logging.FileHandler(filename=self.log_file_name, encoding='utf-8', mode='w')
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(logger_fmt)
