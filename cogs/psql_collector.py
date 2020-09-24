@@ -3,8 +3,9 @@ import itertools
 import logging
 import re
 import time
-from datetime import datetime
-from typing import Optional, Union, NamedTuple, Dict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Optional, Union, Dict
 
 import asyncpg
 import discord
@@ -16,10 +17,12 @@ from ext.utils import QueueItem
 from mrbot import MrBot
 
 
-class Cache(NamedTuple):
-    users: Dict[int, User]
-    channels: Dict[int, Channel]
-    guilds: Dict[int, Guild]
+@dataclass()
+class Cache:
+    users: Dict[int, User] = field(default_factory=dict)
+    channels: Dict[int, Channel] = field(default_factory=dict)
+    guilds: Dict[int, Guild] = field(default_factory=dict)
+    typed: Dict[int, datetime] = field(default_factory=dict)
 
 
 class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': True}):
@@ -65,7 +68,8 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         # --- Logger ---
         self.re_key = re.compile(r'Key.*is not present in table \"(\w+)\"\.')
         self.bot.loop.create_task(self.async_init())
-        self._cache = Cache({}, {}, {})
+        self._type_interval = timedelta(minutes=1)
+        self._cache = Cache()
 
     async def async_init(self):
         await self.bot.connect_task
@@ -118,11 +122,18 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         # Ignore bots
         if user.bot:
             return
+        # Check last update time
+        now = datetime.utcnow()
+        if last_typed := self._cache.typed.get(user.id):
+            if now - last_typed < self._type_interval:
+                return
+        self._cache.typed[user.id] = now
         int_user = User.from_discord(user)
         int_channel = Channel.from_discord(channel)
         q = (f'INSERT INTO {self.psql_table_name_typed} '
              '(time, user_id, ch_id, guild_id) VALUES ($1, $2, $3, $4)')
         q_args = [when, int_user.id, int_channel.id, int_channel.guild_id]
+        self.logger.debug("Updated typed for user %s", user.name)
         await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_channel)))
 
     @commands.Cog.listener()
@@ -142,6 +153,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
             return
 
         user = User.from_discord(member)
+        self.logger.debug("Updated voice state for user %s", user.name)
         await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=user, channel=channel)))
         await self.check_and_update(user=user, channel=channel)
 
@@ -158,6 +170,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         int_user = User.from_discord(ctx.author)
         int_ch = Channel.from_discord(ctx.channel)
         int_guild = Guild.from_discord(ctx.guild)
+        self.logger.debug("Added command %s used by %s to command log", q_args[0], int_user.name)
         await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_ch, guild=int_guild)))
 
     @commands.Cog.listener()
