@@ -35,7 +35,10 @@ class MrBot(commands.Bot):
         logger_fmt = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
         # Console Handler
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
+        if kwargs.pop('log_debug', False):
+            ch.setLevel(logging.DEBUG)
+        else:
+            ch.setLevel(logging.INFO)
         ch.setFormatter(logger_fmt)
         # File Handler
         self.log_file_name = kwargs.pop('log_file_name', None) or 'mrbot.log'

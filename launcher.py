@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import logging
 import os
 from typing import Optional
 
@@ -83,10 +82,8 @@ if __name__ == '__main__':
         owner_id=_args.owner_id,
         extension_override=_args.ext,
         log_file_name=_args.log_file,
+        log_debug=_args.debug,
     )
     if _args.debug:
-        for h in bot.logger.handlers:
-            if isinstance(h, logging.StreamHandler):
-                h.setLevel(logging.DEBUG)
         bot.logger.debug('\n%s', CONFIG.pretty_repr())
     bot.run()
