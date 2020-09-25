@@ -1,14 +1,11 @@
 import json
-from typing import NamedTuple, List, Union, Dict, Optional
+import os
+import re
+from typing import List, Union, Dict, Optional
 
 import discord
 
 from ext.utils import pg_connection
-
-
-class Generic(NamedTuple):
-    name: str
-    value: str
 
 
 class BaseConfig:
@@ -202,6 +199,52 @@ class PostgresConfig(BaseConfig):
         self.web: str = ''
         self.live: str = ''
 
+    def safe_repr(self, _level=0):
+        """Like pretty_repr but hides passwords"""
+        attrs = []
+        for k, v in vars(self).items():
+            if not v:
+                continue
+            name = k
+            if name[0] == '_':
+                name = name[1:]
+            if m := re.match(r'postgres://\S+:(\S+)@\S*/\w+', v):
+                span = m.span(1)
+                safe_v = f'{v[:span[0]]}<password>{v[span[1]:]}'
+                attrs.append(f'{" " * _level * 2}{name}: {str(safe_v)}')
+        return "\n".join(attrs)
+
+
+class PathsConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        self.data: str = kwargs.pop('data', './data')
+        self.upload: str = kwargs.pop('upload', './upload')
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, p):
+        self._verify_path(p)
+        self._data = p
+
+    @property
+    def upload(self):
+        return self._upload
+
+    @upload.setter
+    def upload(self, p):
+        self._verify_path(p)
+        self._upload = p
+
+    @staticmethod
+    def _verify_path(p):
+        if not os.path.exists(p):
+            os.mkdir(p)
+        elif not os.access(p, os.W_OK | os.R_OK):
+            raise RuntimeError(f'Insufficient permissions for {p}')
+
 
 class BotConfig(BaseConfig):
     """Global bot config, will not start without most of it"""
@@ -217,46 +260,69 @@ class BotConfig(BaseConfig):
     psql_all_tables = {(psql_table_name,): psql_table}
 
     def __init__(self, token, psql, api_keys=None, approved_guilds=None, brains='',
-                 data='', guilds=None, hostname='', upload=''):
+                 guilds=None, hostname='', paths=None):
         self.token: str = token
         self.psql: PostgresConfig = psql
         self.api_keys: dict = api_keys or dict()
         self.approved_guilds: List[int] = approved_guilds or []
         self.brains: str = brains
-        self.data: str = data
         self.guilds: Dict[int, GuildDef] = guilds or {}
         self.hostname: str = hostname
-        self.upload: str = upload
+        self.paths: PathsConfig = paths
+
+    def safe_repr(self, _level=0):
+        """Like pretty_repr but shorter and hides sensitive information (token, API keys)"""
+        attrs = []
+        for k, v in vars(self).items():
+            if not v:
+                continue
+            name = k
+            if name[0] == '_':
+                name = name[1:]
+            if func := getattr(v, "safe_repr", None) or getattr(v, "pretty_repr", None):
+                attrs.append(f'{" " * _level * 2}{name}:\n{func(_level+1)}')
+            elif name == 'token':
+                attrs.append(f'{" " * _level * 2}{name}: {v[:3]}...{v[-3:]}')
+            elif name == 'api_keys':
+                attrs.append(f'{" " * _level * 2}{name}: {", ".join(v.keys())}')
+            elif name == 'guilds':
+                attrs.append(f'{" " * _level * 2}{name}:')
+                for g in v.values():
+                    if g.name:
+                        attrs.append(f'{" " * (_level + 1) * 2}{g.name} [{g.id}]')
+                    else:
+                        attrs.append(f'{" " * (_level + 1) * 2}[{g.id}]')
+            else:
+                attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
+        return "\n".join(attrs)
 
     @classmethod
     def from_dict(cls, data: dict):
         """Read all from single dict"""
         kwargs = dict(psql=PostgresConfig(), api_keys={}, approved_guilds=[], guilds={})
-
-        for d in data.get('secrets', []):
+        _paths = dict()
+        for d in data.get('configs', []):
             if v := d.get('token'):
                 kwargs['token'] = v
             if v := d.get('psql'):
                 for name, dsn in v.items():
                     setattr(kwargs['psql'], name, dsn)
-            if v := d.get('approved_guilds'):
-                kwargs['approved_guilds'] += v
             for name, val in d.get('api-keys', {}).items():
                 kwargs['api_keys'][name] = val
-
-        for d in data.get('paths', []):
-            if v := d.get('data'):
-                kwargs['data'] = v
-            if v := d.get('upload'):
-                kwargs['upload'] = v
+            if v := d.get('approved_guilds'):
+                kwargs['approved_guilds'] += v
             if v := d.get('brains'):
                 kwargs['brains'] = v
             if v := d.get('hostname'):
                 kwargs['hostname'] = v
+            for name, val in d.get('paths', {}).items():
+                _paths[name] = val
 
         for d in data.get('guilds', []):
             g = GuildDef.from_dict(d)
             kwargs['guilds'][g.id] = g
+
+        kwargs['paths'] = PathsConfig(**_paths)
 
         if not kwargs.get('token'):
             raise RuntimeError('Token not found in config')
@@ -267,20 +333,14 @@ class BotConfig(BaseConfig):
         return cls(**kwargs)
 
     @classmethod
-    async def from_psql(cls, dsn: str, extra: Dict[str, List[str]] = None):
+    async def from_psql(cls, dsn: str, extra: List[str] = None):
         """Load config from PSQL table, always loads data named main and all guilds"""
-        all_dict = dict(secrets=[], paths=[], guilds=[])
-        extra = extra or dict()
+        all_dict = dict(configs=[], guilds=[])
+        extra = extra or []
 
-        def add_record(r):
-            if r['type'] == 'secrets':
-                all_dict['secrets'].append(json.loads(r['data']))
-            elif r['type'] == 'paths':
-                all_dict['paths'].append(json.loads(r['data']))
-
-        def get_record(r_list, n, t):
+        def get_config(r_list, n):
             for r in r_list:
-                if r['name'] == n and r['type'] == t:
+                if r['name'] == n and r['type'] == 'config':
                     return r
             return None
 
@@ -288,42 +348,33 @@ class BotConfig(BaseConfig):
             all_rows = await con.fetch(f'SELECT * FROM {cls.psql_table_name}')
             # Add main and guilds
             for row in all_rows:
-                if row['name'] == 'main':
-                    add_record(row)
+                if row['name'] == 'main' and row['type'] == 'config':
+                    all_dict['configs'].append(json.loads(row['data']))
                 elif row['type'] == 'guild':
                     all_dict['guilds'].append(json.loads(row['data']))
             # Add extra
-            for r_type in ('secrets', 'paths'):
-                for name in extra.get(r_type, []):
-                    if row := get_record(all_rows, name, r_type):
-                        add_record(row)
-                    else:
-                        raise RuntimeError(f'Requested row {name} of type {r_type} not found in table `{cls.psql_table_name}`')
+            for name in extra:
+                if row := get_config(all_rows, name):
+                    all_dict['configs'].append(json.loads(row['data']))
+                else:
+                    raise RuntimeError(f'Requested config row {name} not found in table `{cls.psql_table_name}`')
         return cls.from_dict(all_dict)
 
     @classmethod
-    def from_json(cls, secrets: Union[str, List[str]], paths: Union[str, List[str]],
-                  guilds: Union[str, List[str]] = None):
+    def from_json(cls, configs: Union[str, List[str]], guilds: Union[str, List[str]] = None):
         """Read secrets and paths JSON files, later data overrides previous data"""
-        all_dict = dict(secrets=[], paths=[], guilds=[])
-        if isinstance(secrets, str):
-            secrets = [secrets]
-        if isinstance(paths, str):
-            paths = [paths]
+        all_dict = dict(configs=[], guilds=[])
+        if isinstance(configs, str):
+            configs = [configs]
         if guilds:
             if isinstance(guilds, str):
                 guilds = [guilds]
         else:
             guilds = []
-        for file_name in secrets:
+        for file_name in configs:
             with open(file_name, 'r') as f:
                 data: dict = json.load(f)
-            all_dict['secrets'].append(data)
-
-        for file_name in paths:
-            with open(file_name, 'r') as f:
-                data: dict = json.load(f)
-            all_dict['paths'].append(data)
+            all_dict['configs'].append(data)
 
         for file_name in guilds:
             with open(file_name, 'r') as f:

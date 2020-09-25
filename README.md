@@ -23,7 +23,7 @@ Launch with `json-config` or `psql-config` respectively.
 
 The data itself is the same between the two, see below for examples.
 
-The load order is important, loading multiple files of the same type (secrets or paths) overrides previous data.
+The load order is important, loading multiple files of the same type overrides previous data.
 
 This is useful for running different instances with slightly different data, as they can share certain settings
 and not others (for example different tokens with otherwise identical configs).
@@ -35,10 +35,10 @@ Must specify PostgreSQL connection string:
  - Read from the environment variable `CONFIG_DSN` using `--env`
  - Read from file using `-f/--file`
 
-All guild definitions and entries named "main" are loaded first.
+All guild definitions and configs named "main" are loaded first.
 
-Extra names may be specified by using `-e <type>:<name>` for example `-e secrets:test` will load
-the row with name `test` and type `secrets`.
+Extra names may be specified by using `-e <name>` for example `-e test` will load
+the row with name `test`.
 
 Examples:
  - `./launcher.py psql-config -c 'postgres://user:password@localhost/db'`
@@ -50,34 +50,35 @@ Examples:
 
 Must specify JSON files to load, at least one for secrets, paths and guilds.
 
-Example `./launcher.py json-config -s config/secrets.json -p config/paths.json -g config/guild.json`
+Example `./launcher.py json-config -c config/config.json -g config/guild.json`
 
 ### Example configs
-`secrets`
+`config`
 ```json
 {
     "token": "",
+    "psql": {
+        "main": "postgres://user:pass@/discord",
+        "public": "postgres://user:pass@/public",
+        "web": "postgres://user:pass@/web"
+    },
     "api-keys": {
         "google": "",
-        "oxford": "",
+        "oxford": {
+          "app_id": "",
+          "app_key": ""
+        },
         "wolfram": ""
     },
-    "psql": {
-        "main": "",
-        "public": ""
-    },
-    "approved_guilds": []
+    "approved_guilds": [],
+    "brains": "http://localhost:7762",
+    "hostname": "https://www.example.com",
+    "paths": {
+        "data": "/data",
+        "upload": "/var/www/discord"
+    }
 }
-```
 
-`paths`
-```json
-{
-    "data": "",
-    "upload": "",
-    "brains": "",
-    "hostname": ""
-}
 ```
 
 `guild`

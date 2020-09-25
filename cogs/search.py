@@ -33,7 +33,7 @@ class Search(commands.Cog, name="Search"):
                 data = await resp.json()
             else:
                 return await ctx.send(f"No definiton found for `{word}` in language {lang}.")
-        with open(f"{self.bot.config.data}/def_{word}_{lang}.json", 'w') as fw:
+        with open(f"{self.bot.config.paths.data}/def_{word}_{lang}.json", 'w') as fw:
             json.dump(data, fw, indent=1)
         embed = emh.embed_init(self.bot, "Oxford Dictionary")
         results = data.get("results", None)

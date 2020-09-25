@@ -280,7 +280,7 @@ class MrBot(commands.Bot):
 
     async def upload_file(self, wb: bytes, file_name: str) -> str:
         """Uploads input bytes and checks the resulting URL to make sure it is valid"""
-        file_path = os.path.join(self.config.upload, file_name)
+        file_path = os.path.join(self.config.paths.upload, file_name)
         url = f'{self.config.hostname}/discord/{file_name}'
         if not os.path.exists(file_path):
             try:

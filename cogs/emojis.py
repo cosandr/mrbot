@@ -28,7 +28,7 @@ class Emojis(commands.Cog, name="Emojis"):
         self.re_file = re.compile(r'_\d+x\d+$')
         self.re_ext = re.compile(r'\.(png|jpeg|jpg|gif)$', re.IGNORECASE)
         self.Emoji = namedtuple('Emoji', ['name', 'filename', 'url'])
-        self.disk_cache = self.bot.config.upload + "/emojis"
+        self.disk_cache = self.bot.config.paths.upload + "/emojis"
         self.url = f'{self.bot.config.hostname}/discord/emojis/'
         if not os.path.exists(self.disk_cache):
             os.mkdir(self.disk_cache, 0o755)

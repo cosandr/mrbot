@@ -29,8 +29,8 @@ class Test:
         # await self.create_all_tables()
         # await self.copy_tables(num_cons=24, max_elem=1000)
         # await self.insert_config_json_psql()
-        config = await BotConfig.from_psql(dsn=self.bot.config.psql.main, extra=dict(secrets=['test']))
-        print(config)
+        config = await BotConfig.from_psql(dsn=self.bot.config.psql.main, extra=['test', 'windows'])
+        print(config.safe_repr())
         # await self.run_plot()
 
     async def insert_config_json_psql(self, live=False):

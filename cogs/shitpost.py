@@ -331,7 +331,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         font = ImageFont.truetype('fonts/consola.ttf', 10)
         draw.text((0, 0), ret_str, font=font)
         filename = f"ascii_{uuid.uuid4().hex}.jpg"
-        filepath = os.path.join(self.bot.config.upload, filename)
+        filepath = os.path.join(self.bot.config.paths.upload, filename)
         img_draw.save(filepath, format='jpeg')
         os.chmod(filepath, 0o644)
         embed.set_field_at(0, name="Characters", value=f"{char_x}x{char_y}", inline=True)
@@ -354,7 +354,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         img_out = img_out.resize((img.width, img.height))
         # Start saving and sending process
         filename = f"ruined_{uuid.uuid4().hex}.{img.format}"
-        filepath = os.path.join(self.bot.config.upload, filename)
+        filepath = os.path.join(self.bot.config.paths.upload, filename)
         img_out.save(filepath, format=img.format)
         os.chmod(filepath, 0o644)
         return filename

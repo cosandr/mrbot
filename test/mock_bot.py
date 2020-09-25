@@ -1,4 +1,5 @@
 import logging
+import platform
 from asyncio import AbstractEventLoop
 from typing import Optional
 
@@ -21,13 +22,14 @@ class Response:
 
 
 class TestBot:
-
     def __init__(self, loop):
         self.loop: AbstractEventLoop = loop
-        self.config = BotConfig.from_json(
-            secrets=['config/secrets.json', 'config/secrets_test.json'],
-            paths=['config/paths.json'],
-        )
+        with open('config/.dsn_test', 'r') as f:
+            dsn = f.read().strip()
+        extra = ['test']
+        if platform.system() == 'Windows':
+            extra.append('windows')
+        self.config = loop.run_until_complete(BotConfig.from_psql(dsn=dsn, extra=extra))
         self.pool_live: Optional[asyncpg.pool.Pool] = None
         self.pool: Optional[asyncpg.pool.Pool] = None
         self.pool_pub: Optional[asyncpg.pool.Pool] = None

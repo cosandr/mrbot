@@ -1,4 +1,5 @@
 import asyncio
+import platform
 import unittest
 
 from mrbot import MrBot
@@ -9,15 +10,18 @@ from ext.internal import Message
 class InternalTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls.loop = asyncio.get_event_loop()
+        with open('config/.dsn_test', 'r') as f:
+            dsn = f.read().strip()
+        extra = ['test']
+        if platform.system() == 'Windows':
+            extra.append('windows')
+        config = cls.loop.run_until_complete(BotConfig.from_psql(dsn=dsn, extra=extra))
         cls.bot = MrBot(
             command_prefix="'",
             owner_id=227847073607712768,
-            config=BotConfig.from_json(
-                secrets=['config/secrets.json', 'config/secrets_test.json'],
-                paths=['config/paths.json'],
-            ),
+            config=config,
         )
-        cls.loop = asyncio.get_event_loop()
         cls.bot_started = False
 
     # noinspection PyUnresolvedReferences

@@ -13,7 +13,7 @@ DSN_ENV = 'CONFIG_DSN'
 
 def json_config(args: argparse.Namespace):
     global CONFIG
-    CONFIG = BotConfig.from_json(secrets=args.secrets, paths=args.paths, guilds=args.guilds)
+    CONFIG = BotConfig.from_json(configs=args.configs, guilds=args.guilds)
 
 
 def psql_config(args: argparse.Namespace):
@@ -27,21 +27,9 @@ def psql_config(args: argparse.Namespace):
         args.file.close()
     else:
         raise RuntimeError('No DSN')
-    extra = dict(secrets=[], paths=[])
-    for e in args.extra:
-        e_split = e.split(':', 1)
-        if len(e_split) != 2:
-            raise RuntimeError(f'Extra table {e} cannot be parsed, write as <type>:<name>')
-        e_type, e_name = e_split
-        if e_type == 'secrets':
-            extra['secrets'].append(e_name)
-        elif e_type == 'paths':
-            extra['paths'].append(e_name)
-        else:
-            raise RuntimeError(f'Unknown type {e_type}, need one of {", ".join(extra.keys())}')
 
     import asyncio
-    CONFIG = asyncio.get_event_loop().run_until_complete(BotConfig.from_psql(dsn=dsn, extra=extra))
+    CONFIG = asyncio.get_event_loop().run_until_complete(BotConfig.from_psql(dsn=dsn, extra=args.extra))
 
 
 parser = argparse.ArgumentParser(description='MrBot launcher')
@@ -56,8 +44,7 @@ grp_bot.add_argument('--debug', action='store_true', help='Log DEBUG to console'
 subparsers = parser.add_subparsers(title='Config load', required=True)
 
 parser_json = subparsers.add_parser('json-config', help='Start using JSON config')
-parser_json.add_argument('-s', '--secrets', action='append', required=True, help='Secrets to load, can be used more than once')
-parser_json.add_argument('-p', '--paths', action='append', required=True, help='Paths to load, can be used more than once')
+parser_json.add_argument('-c', '--configs', action='append', required=True, help='Configs to load, can be used more than once')
 parser_json.add_argument('-g', '--guilds', action='append', required=True, help='Guilds to load, can be used more than once')
 parser_json.set_defaults(func=json_config)
 
@@ -67,7 +54,7 @@ dsn_grp.add_argument('-c', '--dsn', type=str,
                      help=f'PostgreSQL connection string, database must contain {BotConfig.psql_table_name} table')
 dsn_grp.add_argument('--env', action='store_true', help=f'Read DSN from {DSN_ENV} variable')
 dsn_grp.add_argument('-f', '--file', type=argparse.FileType('r'), help='Read DSN from file')
-parser_psql.add_argument('-e', '--extra', action='append', default=[], help='Extra tables to load, write as <type>:<name>')
+parser_psql.add_argument('-e', '--extra', action='append', default=[], help='Extra configs to load')
 parser_psql.set_defaults(func=psql_config)
 
 
@@ -85,5 +72,5 @@ if __name__ == '__main__':
         log_debug=_args.debug,
     )
     if _args.debug:
-        bot.logger.debug('\n%s', CONFIG.pretty_repr())
+        bot.logger.debug('\n%s', CONFIG.safe_repr())
     bot.run()
