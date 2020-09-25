@@ -51,7 +51,7 @@ class MemeTemplate:
 }
     --- JSON file structure ---
     """
-    _font_dir = os.path.join(os.path.dirname(__file__), 'fonts')
+    _font_dir = 'fonts'
     meme_dir = os.path.join(os.path.dirname(__file__), 'meme-templates')
 
     def __init__(self, in_dict: Dict, debug: int = 0):
