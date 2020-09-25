@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import platform
 import signal
 import traceback
 from base64 import b64decode
@@ -61,8 +62,9 @@ class MrBot(commands.Bot):
         self.connect_task: asyncio.Task = self.loop.create_task(self.connect_sess())
         self.extension_override = kwargs.pop('extension_override', None)
         self.load_all_extensions()
-        self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
-        self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
+        if platform.system() != 'Windows':
+            self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
+            self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
         # Queue for message logger
         self.msg_queue = asyncio.PriorityQueue()
         self.psql_lock = asyncio.Lock()
