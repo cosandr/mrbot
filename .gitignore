@@ -1,4 +1,6 @@
 # Bot files
+data/
+upload/
 dumps/
 *.log
 
