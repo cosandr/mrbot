@@ -4,10 +4,10 @@ from typing import Union
 
 from discord.ext import commands
 
-from mrbot import MrBot
 from ext import parsers
 from ext.internal import User
 from ext.psql import create_table, try_run_query, ensure_foreign_key
+from mrbot import MrBot
 
 
 class Insults(commands.Cog, name="Insults"):

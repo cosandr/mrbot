@@ -8,12 +8,12 @@ import numpy as np
 from discord.ext import commands
 
 import ext.embed_helpers as emh
-from mrbot import MrBot
 from ext.checks import open_connection_check
 from ext.errors import UnapprovedGuildError
 from ext.internal import Message
 from ext.parsers import parsers
 from ext.utils import find_similar_str, paginate, human_seconds, to_columns_vert
+from mrbot import MrBot
 
 
 class MachineLearning(commands.Cog, name="Machine Learning"):

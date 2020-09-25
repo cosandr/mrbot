@@ -6,9 +6,9 @@ import discord
 from discord.ext import commands
 
 import ext.embed_helpers as emh
-from mrbot import MrBot
 from ext.parsers import parsers
 from ext.utils import find_similar_str, to_columns_vert
+from mrbot import MrBot
 from .templates import AllMemeTemplates
 
 """

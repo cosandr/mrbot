@@ -6,8 +6,8 @@ from typing import Dict, List, Optional
 import discord
 from discord.ext import commands
 
-from mrbot import MrBot
 from ext import utils
+from mrbot import MrBot
 from .incoming import Incoming
 from .response import Response
 

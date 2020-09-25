@@ -6,10 +6,10 @@ import discord
 from discord.ext import commands
 
 import config as cfg
-from mrbot import MrBot
 from ext.errors import UnapprovedGuildError
 from ext.internal import Message
 from ext.psql import create_table, debug_query
+from mrbot import MrBot
 
 
 class Stars(commands.Cog, name='Stars'):

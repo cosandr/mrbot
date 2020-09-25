@@ -2,9 +2,9 @@ import asyncio
 import platform
 import unittest
 
-from mrbot import MrBot
 from config import BotConfig
 from ext.internal import Message
+from mrbot import MrBot
 
 
 class InternalTests(unittest.TestCase):

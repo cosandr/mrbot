@@ -12,10 +12,10 @@ from PIL import Image
 from discord.ext import commands
 from jellyfish import jaro_winkler_similarity
 
-from mrbot import MrBot
 from ext import utils
 from ext.errors import UnapprovedGuildError
 from ext.internal import Message
+from mrbot import MrBot
 
 
 class Emojis(commands.Cog, name="Emojis"):

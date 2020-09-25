@@ -7,9 +7,9 @@ import asyncpg
 import discord
 
 from cogs.music.errors import *
+from ext.brains.errors import *
 from ext.errors import *
 from ext.parsers.errors import *
-from ext.brains.errors import *
 from ext.utils import paginate, find_similar_str
 
 
