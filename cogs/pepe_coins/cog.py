@@ -11,6 +11,7 @@ from jellyfish import jaro_winkler_similarity
 import ext.embed_helpers as emh
 from ext.psql import create_table
 from ext.utils import fmt_timedelta, human_large_num
+from mrbot import MrBot
 from . import utils as pu
 
 
@@ -48,7 +49,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     info_time = 20                    # How many seconds the info embed is updated for
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: MrBot = bot
         # --- Logger ---
         self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)

@@ -17,8 +17,8 @@ from ext.utils import find_similar_str, paginate, human_seconds, to_columns_vert
 
 
 class MachineLearning(commands.Cog, name="Machine Learning"):
-    def __init__(self, bot: MrBot):
-        self.bot = bot
+    def __init__(self, bot):
+        self.bot: MrBot = bot
         self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
 

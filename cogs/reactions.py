@@ -12,6 +12,7 @@ from ext import utils
 from ext.internal import Guild
 from ext.psql import create_table
 from ext.utils import get_channel_name
+from mrbot import MrBot
 
 
 class Reactions(commands.Cog, name="Reaction"):
@@ -28,7 +29,7 @@ class Reactions(commands.Cog, name="Reaction"):
     psql_all_tables.update({(psql_table_name,): psql_table})
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: MrBot = bot
         # Check required table and load reactions
         self.bot.loop.create_task(self.async_init())
         # --- Logger ---

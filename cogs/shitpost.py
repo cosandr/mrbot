@@ -15,11 +15,12 @@ from ext.checks import open_connection_check
 from ext.internal import Message
 from ext.parsers import parsers
 from ext.utils import find_url_type, bytes_from_url, transparent_embed
+from mrbot import MrBot
 
 
 class Shitpost(commands.Cog, name='Shitposting'):
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: MrBot = bot
         self.all_emoji = list(EMOJI_UNICODE.values())
 
     @commands.command(name='father', brief="Bustin' games", aliases=['textbuster', 'madeby'])

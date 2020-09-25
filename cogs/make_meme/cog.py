@@ -19,8 +19,8 @@ TODO
 
 class MakeMeme(commands.Cog, name="Make Meme"):
 
-    def __init__(self, bot: MrBot):
-        self.bot = bot
+    def __init__(self, bot):
+        self.bot: MrBot = bot
         self._re_entry = re.compile(r'\s*-entry\s+', re.IGNORECASE)
         self._templates = None
         self.bot.loop.create_task(self.cog_load_async())

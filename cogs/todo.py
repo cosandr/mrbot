@@ -11,6 +11,7 @@ from ext.internal import User
 from ext.parsers import parsers
 from ext.parsers.errors import ArgParseError
 from ext.psql import create_table, ensure_foreign_key, debug_query
+from mrbot import MrBot
 
 
 class Todo(commands.Cog, name="Todo"):
@@ -41,7 +42,7 @@ class Todo(commands.Cog, name="Todo"):
     psql_all_tables.update({(psql_table_name,): psql_table})
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: MrBot = bot
         # Check table
         self.bot.loop.create_task(self.async_init())
         # --- Logger ---

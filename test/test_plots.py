@@ -7,8 +7,8 @@ from .mock_bot import TestBot
 
 
 class TestPlot:
-    def __init__(self, bot: TestBot):
-        self.bot = bot
+    def __init__(self, bot):
+        self.bot: TestBot = bot
 
     async def msg_plot(self):
         """Plot messages sent within a specific timeframe"""

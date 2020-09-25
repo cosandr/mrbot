@@ -24,8 +24,8 @@ class Stars(commands.Cog, name='Stars'):
     psql_all_tables = Message.psql_all_tables.copy()
     psql_all_tables.update({(psql_table_name,): psql_table})
 
-    def __init__(self, bot: MrBot):
-        self.bot = bot
+    def __init__(self, bot):
+        self.bot: MrBot = bot
         self.bot.loop.create_task(self.async_init())
         # --- Logger ---
         self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
