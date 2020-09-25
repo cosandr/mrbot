@@ -1,2 +1,2 @@
-from .config import *
+from .constants import *
 from .types import BotConfig, DefaultPermissions

@@ -16,7 +16,7 @@ Check `launcher.py -h` for launch options.
 
 ## Configuration
 
-[config.py](config/config.py) is for general bot settings.
+[constants.py](config/constants.py) is for general bot settings.
 
 Config can be loaded from JSON files or a PSQL table.
 Launch with `json-config` or `psql-config` respectively.

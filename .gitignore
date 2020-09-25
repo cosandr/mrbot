@@ -2,10 +2,8 @@
 dumps/
 *.log
 
-config/*
-!config/__init__.py
-!config/config.py
-!config/types.py
+config/*.json
+config/.*
 
 # Editor files
 .vscode/settings.json
