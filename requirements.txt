@@ -1,4 +1,4 @@
-discord.py[voice]
+discord.py[voice]>=1.5
 # git+https://github.com/Rapptz/discord.py@master#egg=discord.py[voice]
 jellyfish
 numpy

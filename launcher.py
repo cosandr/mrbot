@@ -4,6 +4,8 @@ import argparse
 import os
 from typing import Optional
 
+import discord
+
 from config import BotConfig
 from mrbot import MrBot
 
@@ -70,6 +72,7 @@ if __name__ == '__main__':
         extension_override=_args.ext,
         log_file_name=_args.log_file,
         log_debug=_args.debug,
+        intents=discord.Intents.all(),
     )
     if _args.debug:
         bot.logger.debug('\n%s', CONFIG.safe_repr())
