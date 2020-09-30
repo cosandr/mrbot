@@ -2,19 +2,19 @@ import os
 import random
 import time
 import uuid
+from contextlib import suppress
 
+import PIL
 import discord
 import numpy as np
-from PIL import (Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont,
-                 ImageOps)
 from discord.ext import commands
 from emoji import EMOJI_UNICODE
 
 import ext.embed_helpers as emh
+from ext import utils
 from ext.checks import open_connection_check
 from ext.internal import Message
 from ext.parsers import parsers
-from ext.utils import find_url_type, bytes_from_url, transparent_embed
 from mrbot import MrBot
 
 
@@ -26,17 +26,20 @@ class Shitpost(commands.Cog, name='Shitposting'):
     @commands.command(name='father', brief="Bustin' games", aliases=['textbuster', 'madeby'])
     async def post_gamebuster_image(self, ctx: commands.Context):
         # Transparent embed
-        embed = transparent_embed()
+        embed = utils.transparent_embed()
         embed.set_image(url='https://cdn.discordapp.com/attachments/425792779294212147/699648132253745262/dre.jpg')
         await ctx.send(embed=embed)
 
-    @commands.command(name='ascii', brief='Transform image into ASCII art',
+    @commands.command(
+        name='ascii',
+        brief='Transform image into ASCII art',
         usage=("1. User who sent image or message ID.\nTakes most recent image if nobody is specified.\n"
-               "This thing tries to generate ASCII art from input images."))
+               "This thing tries to generate ASCII art from input images."),
+    )
     async def ascii(self, ctx, msg_id=None, char_x=150):
         embed = emh.embed_init(self.bot, "ASCII")
-        embed.add_field(name="Characters", value=char_x, inline=True)
-        embed.add_field(name="Resolution", value=char_x*12, inline=True)
+        embed.add_field(name="Characters", value=str(char_x), inline=True)
+        embed.add_field(name="Resolution", value=str(char_x*12), inline=True)
         if msg_id:
             embed.set_footer(text=f"Searching for image from {msg_id}.", icon_url=embed.footer.icon_url)
         else:
@@ -46,7 +49,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         if not res:
             return await emh.embed_img_not_found(msg, embed)
         else:
-            img = Image.open(await bytes_from_url(res.first_image, self.bot.aio_sess))
+            img = PIL.Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
             embed.set_footer(text=f"ASCII'ing {res.author.display_name}'s image.", icon_url=embed.footer.icon_url)
             await msg.edit(embed=embed)
         # Prevent large images for anyone except owner.
@@ -56,9 +59,12 @@ class Shitpost(commands.Cog, name='Shitposting'):
         embed.title = f"{res.author.display_name}'s image has been ASCII'd."
         return await emh.embed_img_with_time(ctx, msg, embed, filename, time.perf_counter()-start)
 
-    @commands.command(name='ruin', brief='Ruin an image',
+    @commands.command(
+        name='ruin',
+        brief='Ruin an image',
         usage=("1. User who sent image or message ID.\nTakes most recent image if nobody is specified.\n"
-               "Applies a bunch of garbage effects in an attempt to output a terrible picture."))
+               "Applies a bunch of garbage effects in an attempt to output a terrible picture."),
+    )
     async def ruin(self, ctx, msg_id=None):
         embed = emh.embed_init(self.bot, "Ruin")
         if msg_id:
@@ -70,16 +76,19 @@ class Shitpost(commands.Cog, name='Shitposting'):
         if not res:
             return await emh.embed_img_not_found(msg, embed)
         else:
-            img = Image.open(await bytes_from_url(res.first_image, self.bot.aio_sess))
+            img = PIL.Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
             start = time.perf_counter()
             filename = await self.bot.loop.run_in_executor(None, lambda: self.img_ruin(img))
             embed.title = f"{res.author.display_name}'s image has been ruined"
             embed.description = "Mr. Bot hopes you are satisfied with the result."
             return await emh.embed_img_with_time(ctx, msg, embed, filename, time.perf_counter()-start)
 
-    @commands.command(name='shitpost', brief='Rate shitpost quality, now more smarterer',
+    @commands.command(
+        name='shitpost',
+        brief='Rate shitpost quality, now more smarterer',
         usage=("1. User who sent image or message ID.\nTakes most recent image if nobody is specified.\n"
-               "Uses TensorFlow M A C H I N E  L E A R N I N G to rate an image."))
+               "Uses TensorFlow M A C H I N E  L E A R N I N G to rate an image."),
+    )
     @open_connection_check()
     async def shitpost(self, ctx, msg_id=None):
         embed = emh.embed_init(self.bot, "Rate shitpost")
@@ -91,7 +100,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         res: Message = await Message.with_url(ctx, msg_id, img_only=False)
         if not res:
             return await emh.embed_img_not_found(msg, embed)
-        url_type = find_url_type(res.first_url)
+        url_type = utils.find_url_type(res.first_url)
         if url_type == 'image':
             embed.set_footer(text=f"Image found", icon_url=embed.footer.icon_url)
             embed.title = f"{res.author.display_name}'s image rating"
@@ -113,40 +122,38 @@ class Shitpost(commands.Cog, name='Shitposting'):
             embed.description = f"Mr. Bot doesn't have any opinion about {res.author.display_name}'s link."
             return await msg.edit(embed=embed)
 
-    @commands.command(name='dyingtext', brief='yOU cAn SPeciFy uSEr tOo',
-        usage="1. User who sent the message or the message ID.\nTakes the most recent message if no arugment is given.")
-    async def dyingtext(self, ctx, msg_id='any'):
-        try:
-            msg_id = int(msg_id)
-            try:
-                history = await ctx.fetch_message(msg_id)
-            except discord.errors.NotFound:
-                return await ctx.send(f"No message with ID {msg_id} found.")
-            msg = history.content
-        except ValueError:
-            if msg_id.lower() == 'any':
-                msg = ''
-                history = ctx.history(limit=10, before=ctx.message.created_at)
-                async for m in history:
-                    if m.author != self.bot.user:
-                        msg = m.content
-                        break
-                if msg == '':
-                    return await ctx.send("No message found.")
-            else:
-                msg = ''
-                history = ctx.history(limit=20, before=ctx.message.created_at)
-                async for m in history:
-                    if msg_id.lower() in m.author.display_name.lower():
-                        msg = m.content
-                        break
-                if msg == '':
-                    return await ctx.send("No message found.")
+    @parsers.command(
+        name='dyingtext',
+        brief='yOU cAn SPeciFy uSEr tOo',
+        aliases=['killtext', 'killtxt'],
+        usage="1. User who sent the message or the message ID.\nTakes the most recent message if no arugment is given.",
+        parser_args=[
+            parsers.Arg('content', nargs='*', help='Text to destroy'),
+            parsers.Arg('-m', '--message-id', type=int, help='Use content from message ID'),
+        ],
+    )
+    async def dying_text(self, ctx: commands.Context, *args):
+        parsed = ctx.command.parser.parse_args(args)
+        if not parsed.content and not parsed.message_id:
+            return await ctx.send('Specify either content or message ID with `-m` option')
+        if parsed.message_id:
+            msg = await Message.from_id(ctx, msg_id=parsed.message_id)
+            if not msg:
+                return await ctx.send(f'No message with ID {parsed.message_id} found.')
+            content = msg.content
+        else:
+            content = ' '.join(parsed.content)
+        # Try to delete message
+        with suppress(Exception):
+            await ctx.message.delete()
+        for p in utils.paginate(self.kill_text(content), wrap=None):
+            await ctx.send(p)
 
-        return await ctx.send(self.kill_text(msg)[0:2000])
-
-    @commands.command(name='shitgen', brief='Advanced technology, optionally specify length',
-        usage="1. Number of words to use when generating shitpost.")
+    @commands.command(
+        name='shitgen',
+        brief='Advanced technology, optionally specify length',
+        usage="1. Number of words to use when generating shitpost.",
+    )
     async def shitgen(self, ctx, length=None):
         if length is None:
             length = 30
@@ -305,7 +312,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
 
         return "".join(msg_list)
 
-    def img_ascii(self, img: Image, char_x: int, embed: discord.Embed):
+    def img_ascii(self, img: PIL.Image, char_x: int, embed: discord.Embed):
         """ASCII'fy an image"""
         start = time.perf_counter()
         char_y = int(char_x*(img.height/img.width))
@@ -326,9 +333,9 @@ class Shitpost(commands.Cog, name='Shitposting'):
                         ret_str += f"{asciichars[i]:2s}"
                         break
             ret_str += '\n'
-        img_draw = Image.new("RGB", (char_x*12, char_y*12))
-        draw = ImageDraw.Draw(img_draw)
-        font = ImageFont.truetype('fonts/consola.ttf', 10)
+        img_draw = PIL.Image.new("RGB", (char_x * 12, char_y * 12))
+        draw = PIL.ImageDraw.Draw(img_draw)
+        font = PIL.ImageFont.truetype('fonts/consola.ttf', 10)
         draw.text((0, 0), ret_str, font=font)
         filename = f"ascii_{uuid.uuid4().hex}.jpg"
         filepath = os.path.join(self.bot.config.paths.upload, filename)
@@ -338,17 +345,17 @@ class Shitpost(commands.Cog, name='Shitposting'):
         embed.set_field_at(1, name="Resolution", value=f"{img_draw.width}x{img_draw.height}", inline=True)
         return embed, filename, start
 
-    def img_ruin(self, img: Image) -> str:
+    def img_ruin(self, img: PIL.Image) -> str:
         # Start image brains.
-        img_out = img.filter(ImageFilter.EDGE_ENHANCE_MORE)  # kinda like sharpen
-        img_out = img_out.filter(ImageFilter.BoxBlur(random.randint(1, 5)))
-        img_out = img_out.filter(ImageFilter.MinFilter(random.randrange(3, 11+1, 2)))
-        enhancer = ImageEnhance.Sharpness(img_out)
+        img_out = img.filter(PIL.ImageFilter.EDGE_ENHANCE_MORE)  # kinda like sharpen
+        img_out = img_out.filter(PIL.ImageFilter.BoxBlur(random.randint(1, 5)))
+        img_out = img_out.filter(PIL.ImageFilter.MinFilter(random.randrange(3, 11 + 1, 2)))
+        enhancer = PIL.ImageEnhance.Sharpness(img_out)
         factor = random.randint(200, 500)
         img_out = enhancer.enhance(factor)
         # Sometimes flip the image
         if random.randint(1, 50) > 40:
-            img_out = ImageOps.mirror(img_out)
+            img_out = PIL.ImageOps.mirror(img_out)
         # Make it trash resolution
         img_out = img_out.resize((int(img.width/random.randint(2, 5)), int(img.height/random.randint(2, 5))))
         img_out = img_out.resize((img.width, img.height))
@@ -362,7 +369,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
     async def img_rate(self, url, pnas):
         r = await self.bot.brains_post_request('/image_label/run', data=dict(model_type='meme', url=url, pnas=pnas))
         if not r.ok:
-            return await r.fail_msg
+            return r.fail_msg
         results, labels = np.array(r.data['results']), r.data['labels']
         top_k = results.argsort()[-3:][::-1]
         tmp = labels[top_k[0]]
