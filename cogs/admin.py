@@ -28,7 +28,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         self.bot: MrBot = bot
         self._last_result = None
         # --- Logger ---
-        self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
+        self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
 

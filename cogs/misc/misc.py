@@ -63,7 +63,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         self.pub_dsn: str = ''
         self.read_config()
         # --- Logger ---
-        self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
+        self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self.bot.loop.create_task(self.async_init())
@@ -589,7 +589,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         else:
             msg = await ctx.history(limit=2, before=ctx.message).get()
         await ctx.message.delete()
-        await self.bot.add_reaction_str(msg, text)
+        await ctx.add_reaction_str(text)
 
     @commands.command(name='stream', brief="Post Dre's livestream link")
     async def stream(self, ctx):

@@ -54,8 +54,7 @@ class MrBot(commands.Bot):
         # Discord logger (API stuff)
         logging.getLogger('discord').setLevel(logging.WARNING)
         # Bot logger
-        self.logger_name = self.__class__.__name__
-        self.logger = logging.getLogger(self.logger_name)
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         # --- Load stuff ---

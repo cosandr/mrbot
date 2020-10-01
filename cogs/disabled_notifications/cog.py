@@ -20,7 +20,7 @@ class Notifications(commands.Cog):
         self.bot: MrBot = bot
         self.server: Optional[asyncio.AbstractServer] = None
         # --- Logger ---
-        self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
+        self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self.bot.loop.create_task(self.async_init())

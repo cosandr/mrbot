@@ -63,7 +63,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         self.con: Optional[asyncpg.Connection] = None
         self.lock: asyncio.Lock = asyncio.Lock()
         # --- Logger ---
-        self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
+        self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self.re_key = re.compile(r'Key.*is not present in table \"(\w+)\"\.')

@@ -16,7 +16,7 @@ class Stalk(commands.Cog, name="Stalk"):
     def __init__(self, bot):
         self.bot: MrBot = bot
         # --- Logger ---
-        self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
+        self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self.stalk_dict = {

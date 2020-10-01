@@ -21,7 +21,7 @@ class Music(commands.Cog, name="YouTube Music"):
         self.api_key: str = ''
         self.read_config()
         # --- Logger ---
-        self.logger = logging.getLogger(f'{self.bot.logger_name}.{self.__class__.__name__}')
+        self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self.voice_con = None
