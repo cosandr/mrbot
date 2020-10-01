@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Tuple
 
 import asyncpg
-from discord.ext import commands
 
+from ext.context import Context
 from ext.internal import User, Guild
 from ext.utils import paginate
 
@@ -40,16 +40,16 @@ class Pasta:
                 self.guild_id == other.guild_id and
                 self.added == other.added)
 
-    async def send(self, ctx: commands.Context):
+    async def send(self, ctx: Context):
         for p in paginate(self.content, wrap=''):
             await ctx.send(p)
 
-    async def maybe_send(self, ctx: commands.Context):
+    async def maybe_send(self, ctx: Context):
         if err := self.view_error(ctx):
             return await ctx.send(err)
         return await self.send(ctx)
 
-    def edit_error(self, ctx: commands.Context) -> str:
+    def edit_error(self, ctx: Context) -> str:
         # Pasta has set owner
         if self.user_id:
             if ctx.author.id != self.user_id and ctx.author.id != ctx.bot.owner_id:
@@ -59,7 +59,7 @@ class Pasta:
             return f'{self.name} belongs to {self.guild_name}.'
         return ''
 
-    def view_error(self, ctx: commands.Context) -> str:
+    def view_error(self, ctx: Context) -> str:
         """Returns error string if calling user doesn't permission to view this pasta,
         empty string if it can be viewed.
 
@@ -86,7 +86,7 @@ class Pasta:
             return f'{self.name} can only be used by {owner_name} or in {guild_name}.'
         return f'{self.name} can only be used by {owner_name}.'
 
-    def check_permissions(self, ctx: commands.Context) -> bool:
+    def check_permissions(self, ctx: Context) -> bool:
         """Returns True if calling user has permission to view this pasta"""
         return not self.view_error(ctx)
 

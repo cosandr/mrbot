@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import logging
@@ -5,16 +7,19 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional, Union, Dict
+from typing import TYPE_CHECKING, Optional, Union, Dict
 
 import asyncpg
 import discord
 from discord.ext import commands
 
+from ext.context import Context
 from ext.internal import Channel, Guild, Message, User
 from ext.psql import create_table, debug_query, ensure_foreign_key, try_foreign_key_add
 from ext.utils import QueueItem
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 @dataclass()
@@ -93,7 +98,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         await self.bot.msg_queue.put(QueueItem(0, ensure_foreign_key(con=self.con, obj=User.from_discord(self.bot.user),
                                                                      logger=self.logger)))
 
-    async def cog_check(self, ctx):
+    async def cog_check(self, ctx: Context):
         return await self.bot.is_owner(ctx.author)
 
     def cog_unload(self):
@@ -158,7 +163,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         await self.check_and_update(user=user, channel=channel)
 
     @commands.Cog.listener()
-    async def on_command(self, ctx: commands.Context):
+    async def on_command(self, ctx: Context):
         """Update command_log"""
         cog_name = ctx.cog.__cog_name__ if ctx.cog else None
         guild_id = ctx.guild.id if ctx.guild else None

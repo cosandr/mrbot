@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import itertools
 import logging
-from typing import Union
+from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
 from ext import parsers
+from ext.context import Context
 from ext.internal import User
 from ext.psql import create_table, try_run_query, ensure_foreign_key
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Insults(commands.Cog, name="Insults"):
@@ -40,16 +45,24 @@ class Insults(commands.Cog, name="Insults"):
         async with self.bot.psql_lock:
             await create_table(self.bot.pool, names, q, self.logger)
 
-    @parsers.group(name='insult', aliases=['fuck'], brief='Are you mad at someone?', invoke_without_command=True)
-    async def insult(self, ctx: commands.Context, victim: Union[int, str]):
-        if victim == 'me':
+    @parsers.group(
+        name='insult',
+        aliases=['fuck'],
+        brief='Are you mad at someone?',
+        invoke_without_command=True,
+        parser_args=[
+            parsers.Arg('victim', type=str, help='Victim name or ID'),
+        ],
+    )
+    async def insult(self, ctx: Context):
+        if ctx.parsed.victim == 'me':
             target = User.from_discord(ctx.author)
-        elif victim == 'you':
+        elif ctx.parsed.victim == 'you':
             target = User.from_discord(self.bot.user)
         else:
-            target = await User.from_search(ctx, victim, with_nick=True)
+            target = await User.from_search(ctx, ctx.parsed.victim, with_nick=True)
         if not target:
-            return await ctx.send(f'No user {victim} found.')
+            return await ctx.send(f'No user {ctx.parsed.victim} found.')
         q = (f'SELECT content FROM {self.psql_table_name} WHERE '
              '(src_id=$1 OR src_id is NULL) '
              'AND (not_src_id is NULL OR not_src_id!=$1) '
@@ -69,29 +82,28 @@ class Insults(commands.Cog, name="Insults"):
             parsers.Arg('-s', '--source', type=str, help='Use this insult when it is used by specified user', default='me'),
         ],
     )
-    async def insult_add(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        content = ' '.join(parsed.content)
-        if parsed.not_source:
-            src = await User.from_search(ctx, parsed.not_source, with_nick=True)
-        elif parsed.source == 'me':
+    async def insult_add(self, ctx: Context):
+        content = ' '.join(ctx.parsed.content)
+        if ctx.parsed.not_source:
+            src = await User.from_search(ctx, ctx.parsed.not_source, with_nick=True)
+        elif ctx.parsed.source == 'me':
             src = User.from_discord(ctx.author)
         else:
-            src = await User.from_search(ctx, parsed.source, with_nick=True)
+            src = await User.from_search(ctx, ctx.parsed.source, with_nick=True)
         if not src:
-            return await ctx.send(f'No user {parsed.source} found.')
-        target = await User.from_search(ctx, parsed.victim, with_nick=True)
+            return await ctx.send(f'No user {ctx.parsed.source} found.')
+        target = await User.from_search(ctx, ctx.parsed.victim, with_nick=True)
         if not target:
-            return await ctx.send(f'No user {parsed.victim} found.')
+            return await ctx.send(f'No user {ctx.parsed.victim} found.')
         async with self.bot.pool.acquire() as con:
             src_str = 'src_id'
-            if parsed.not_source:
+            if ctx.parsed.not_source:
                 src_str = 'not_src_id'
             q = f'SELECT content FROM {self.psql_table_name} WHERE {src_str}=$1 AND dst_id=$2'
             q_args = [src.id, target.id]
             exists = await con.fetchval(q, *q_args)
             if exists:
-                if parsed.not_source:
+                if ctx.parsed.not_source:
                     return await ctx.send((f'An insult for {target.display_name} when it is not used '
                                            f'by {src.display_name} already exists```\n{exists}```'))
                 return await ctx.send((f'An insult for {target.display_name} when it is used '
@@ -100,7 +112,7 @@ class Insults(commands.Cog, name="Insults"):
             q_args.append(content)
             await ensure_foreign_key(con, src, self.logger)
             await try_run_query(con, q, q_args, self.logger, user=target)
-        if parsed.not_source:
+        if ctx.parsed.not_source:
             return await ctx.send((f'Added insult for {target.display_name} when it is not used '
                                    f'by {src.display_name}```\n{content}```'))
         return await ctx.send((f'Added insult for {target.display_name} when it is used '

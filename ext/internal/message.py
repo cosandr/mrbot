@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 from datetime import datetime, timezone
-from typing import Union, List, Optional, Tuple
+from typing import TYPE_CHECKING, Union, List, Optional, Tuple
 
 import asyncpg
 import discord
@@ -11,11 +11,14 @@ from discord.ext import commands
 
 import config as cfg
 from ext.utils import get_url, re_id, find_similar_str
-from mrbot import MrBot
 from .base import Common
 from .channel import Channel
 from .guild import Guild
 from .user import User
+from ..context import Context
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Message(Common):
@@ -241,7 +244,7 @@ class Message(Common):
         embed.add_field(name=name, value=value, inline=False)
         return embed
 
-    async def to_discord(self, bot: Union[MrBot, commands.Bot]) -> Optional[discord.Message]:
+    async def to_discord(self, bot: MrBot) -> Optional[discord.Message]:
         """Returns a discord.Message, if it exists"""
         # Check internal cache
         for msg in bot.cached_messages:
@@ -271,13 +274,13 @@ class Message(Common):
         return msg.jump_url
 
     @staticmethod
-    async def to_discord_from_id(bot: Union[MrBot, commands.Bot], msg_id: int, ch_id: int):
+    async def to_discord_from_id(bot: MrBot, msg_id: int, ch_id: int):
         # We only need message and channel IDs
         msg: Message = Message(id_=msg_id, channel=Channel(id_=ch_id))
         return await msg.to_discord(bot)
 
     @classmethod
-    async def from_user_id(cls, ctx: Union[MrBot, commands.Context], user_id: int, ch_id: int = None, **kwargs) -> Optional[Message]:
+    async def from_user_id(cls, ctx: Union[MrBot, Context], user_id: int, ch_id: int = None, **kwargs) -> Optional[Message]:
         """Attempt to return the last message sent by user ID
         :param ctx: Context or Bot instance, ch_id must be provided in order to fetch from API using a Bot
         :param user_id: ID of the user we're interested in
@@ -314,7 +317,7 @@ class Message(Common):
         return None
 
     @classmethod
-    async def from_id(cls, ctx: Union[MrBot, commands.Context], msg_id: int, ch_id: int = None, **kwargs) -> Optional[Message]:
+    async def from_id(cls, ctx: Union[MrBot, Context], msg_id: int, ch_id: int = None, **kwargs) -> Optional[Message]:
         """Attempt to return the Message with given ID
 
         :param ctx: Context or Bot instance, ch_id must be provided in order to fetch from API using a Bot
@@ -364,7 +367,7 @@ class Message(Common):
 
     # noinspection PyTypeChecker
     @staticmethod
-    def _split_ctx(ctx: Union[MrBot, commands.Context], ch_id: int = None) -> Tuple[MrBot, discord.TextChannel, int]:
+    def _split_ctx(ctx: Union[MrBot, Context], ch_id: int = None) -> Tuple[MrBot, discord.TextChannel, int]:
         """Split Context into bot and channel, try to get channel if Bot and ch_id are given."""
         if isinstance(ctx, commands.Bot):
             bot: MrBot = ctx
@@ -372,7 +375,7 @@ class Message(Common):
                 channel = None
             else:
                 channel: discord.TextChannel = bot.get_channel(ch_id)
-        elif isinstance(ctx, commands.Context):
+        elif isinstance(ctx, Context):
             bot: MrBot = ctx.bot
             channel: discord.TextChannel = ctx.channel
             ch_id = ctx.channel.id
@@ -381,7 +384,7 @@ class Message(Common):
         return bot, channel, ch_id
 
     @classmethod
-    async def with_url(cls, ctx: Union[MrBot, commands.Context], search: Union[None, int, str] = None, ch_id: int = None,
+    async def with_url(cls, ctx: Union[MrBot, Context], search: Union[None, int, str] = None, ch_id: int = None,
                        img_only: bool = False, skip_id: Optional[int] = None) -> Optional[Message]:
         """Look for a message with a URL in it
 

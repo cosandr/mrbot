@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -9,6 +11,7 @@ from datetime import timezone
 from io import StringIO
 from textwrap import indent
 from traceback import format_exc
+from typing import TYPE_CHECKING
 
 import discord
 import psutil
@@ -16,11 +19,14 @@ from discord.ext import commands
 
 import config as cfg
 import ext.embed_helpers as emh
+from ext.context import Context
 from ext.internal import User
 from ext.parsers import parsers
 from ext.psql import debug_query
 from ext.utils import paginate
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
@@ -32,7 +38,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
 
-    async def cog_check(self, ctx):
+    async def cog_check(self, ctx: Context):
         if not await self.bot.is_owner(ctx.author):
             raise commands.errors.NotOwner
         return True
@@ -48,10 +54,9 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             parsers.Arg('--with_status', default=False, help='Fetch latest status', action='store_true'),
         ],
     )
-    async def test_user_search(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        search = ' '.join(parsed.search)
-        kwargs = vars(parsed)
+    async def test_user_search(self, ctx: Context):
+        search = ' '.join(ctx.parsed.search)
+        kwargs = vars(ctx.parsed)
         kwargs.pop('search')
         user = await User.from_search(ctx, search, **kwargs)
         if not user:
@@ -59,7 +64,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         return await ctx.send(f'```{user.pretty_repr()}```')
 
     @commands.command(name='logs', brief='Get bot logs')
-    async def get_logs(self, ctx, lines: int = 10):
+    async def get_logs(self, ctx: Context, lines: int = 10):
         ret_str = ''
         i = 0
         with open(self.bot.log_file_name, 'r', encoding='utf-8') as fr:
@@ -73,11 +78,11 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         await ctx.send(f'```\n{ret_str}\n```')
 
     @commands.group(name='psql-fix')
-    async def psql_fix(self, ctx):
+    async def psql_fix(self, ctx: Context):
         pass
 
     @psql_fix.command(name='user-nicks', brief='Update nicks in PSQL')
-    async def psql_fix_user_nicks(self, ctx: commands.Context):
+    async def psql_fix_user_nicks(self, ctx: Context):
         start = time.perf_counter()
         done = 0
         failed = 0
@@ -97,7 +102,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         await ctx.send(f'Added/updated {done} [{failed} failed] user nicks in {((time.perf_counter() - start) * 1000):,.3f}ms.')
 
     @psql_fix.command(name='users', brief='Update users in PSQL')
-    async def psql_fix_users(self, ctx: commands.Context):
+    async def psql_fix_users(self, ctx: Context):
         start = time.perf_counter()
         done = 0
         failed = 0
@@ -115,17 +120,17 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
 
     @commands.command(name='botcolour', brief='Changes bot role colour')
     @commands.bot_has_permissions(manage_roles=True)
-    async def botcolour(self, ctx, colour: str):
+    async def colour_bot(self, ctx: Context, colour: str):
         role = discord.utils.get(ctx.guild.roles, name='MrBot')
         await role.edit(colour=discord.Colour(int(colour, 16)))
         await ctx.send(f'Bot colour changed to {colour}')
 
     @parsers.group(name='dump', brief='Dump stuff group', invoke_without_command=False)
-    async def dump(self, ctx):
+    async def dump(self, ctx: Context):
         return
 
     @dump.command(name='roles', brief='Dump all roles in this guild')
-    async def dump_roles(self, ctx: commands.Context):
+    async def dump_roles(self, ctx: Context):
         """Dumps discord.Permissions objects"""
         all_roles = {}
         for role in ctx.guild.roles:
@@ -136,7 +141,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         await ctx.send(f'Dumped {len(all_roles)} roles in guild')
 
     @dump.command(name='channels', brief='Dump all channels in this guild', enabled=False)
-    async def dump_channels(self, ctx: commands.Context):
+    async def dump_channels(self, ctx: Context):
         """BROKEN"""
         all_channels = {}
         role_names = [r.name for r in ctx.guild.roles]
@@ -151,7 +156,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         await ctx.send(f'Dumped {len(all_channels)} roles in guild')
 
     @parsers.group(name='reset', brief='Reset stuff group', invoke_without_command=False)
-    async def reset(self, ctx):
+    async def reset(self, ctx: Context):
         return
 
     @reset.command(
@@ -163,10 +168,9 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
     )
     @commands.bot_has_permissions(manage_roles=True)
     @commands.has_permissions(manage_roles=True)
-    async def reset_roles(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
+    async def reset_roles(self, ctx: Context):
         dry_run = True
-        if parsed.i_mean_it:
+        if ctx.parsed.i_mean_it:
             dry_run = False
             await ctx.send(f'Resetting roles, FOR REAL')
         else:
@@ -261,15 +265,14 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
     )
     @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
     @commands.has_permissions(manage_roles=True, manage_channels=True)
-    async def reset_rmchow(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if parsed.i_mean_it:
+    async def reset_rmchow(self, ctx: Context):
+        if ctx.parsed.i_mean_it:
             await ctx.send(f'Resetting roles, FOR REAL')
         else:
             await ctx.send(f'Resetting roles, dry run')
         for ch in ctx.guild.text_channels:
             for target in ch.overwrites.keys():
-                if parsed.i_mean_it:
+                if ctx.parsed.i_mean_it:
                     await ch.set_permissions(target, overwrite=None)
                 print(f'Cleared overwrites for {target.name} in {ch.name}')
 
@@ -283,25 +286,24 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
     )
     @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
     @commands.has_permissions(manage_roles=True, manage_channels=True)
-    async def reset_chperms(self, ctx: commands.Context, *args):
+    async def reset_chperms(self, ctx: Context):
         guild_def = self.bot.config.guilds.get(ctx.guild.id, None)
         if not guild_def:
             return await ctx.send(f'No definitions for this guild.')
         if not guild_def.text_channels:
             return await ctx.send(f'No channel definitions for this guild.')
-        parsed = ctx.command.parser.parse_args(args)
-        if parsed.i_mean_it:
+        if ctx.parsed.i_mean_it:
             await ctx.send(f'Resetting channel permissions, FOR REAL')
         else:
             await ctx.send(f'Resetting channel permissions, dry run')
         ret_str = ''
         for ch_name, ch_def in guild_def.text_channels.items():
-            if parsed.name != 'all' and ch_name != parsed.name:
+            if ctx.parsed.name != 'all' and ch_name != ctx.parsed.name:
                 continue
             channel = discord.utils.get(ctx.guild.text_channels, name=ch_name)
             if not channel:
                 ret_str += f'No channel {ch_name}, creating\n'
-                if parsed.i_mean_it:
+                if ctx.parsed.i_mean_it:
                     channel = await ctx.guild.create_text_channel(ch_name)
             allow_names = [name for name in ch_def.roles]
             allow_names += [name for name in ch_def.member_names]
@@ -313,7 +315,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             denied = []
             # Do we deny everyone?
             if '@everyone' not in allow_names:
-                if parsed.i_mean_it:
+                if ctx.parsed.i_mean_it:
                     await channel.set_permissions(ctx.guild.default_role, overwrite=cfg.DefaultPermissions.deny())
                 denied.append('@everyone')
             for r_name in allow_names:
@@ -322,11 +324,11 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
                     ret_str += f'{r_name} not found in this guild\n'
                 # Allow current role access
                 if ch_def.read_only:
-                    if parsed.i_mean_it:
+                    if ctx.parsed.i_mean_it:
                         await channel.set_permissions(r, overwrite=cfg.DefaultPermissions.read_only())
                     allowed_ro.append(r.name)
                 else:
-                    if parsed.i_mean_it:
+                    if ctx.parsed.i_mean_it:
                         await channel.set_permissions(r, overwrite=cfg.DefaultPermissions.read_write())
                     allowed_rw.append(r.name)
             ret_str += f'#{channel}\n'
@@ -341,11 +343,11 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             await ctx.send(p)
 
     @commands.command(name='test')
-    async def test(self, ctx):
+    async def test(self, ctx: Context):
         return
 
     @commands.command()
-    async def stats(self, ctx):
+    async def stats(self, ctx: Context):
         embed = emh.embed_init(self.bot, "System Stats")
         # CPU
         embed.title = "CPU"
@@ -376,7 +378,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         return await msg.edit(embed=embed)
 
     @commands.command()
-    async def eval(self, ctx, *, body: str):
+    async def eval(self, ctx: Context, *, body: str):
         env = {
             'bot': self.bot,
             'ctx': ctx,
@@ -432,7 +434,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
 
     @commands.command(name='delete')
     @commands.bot_has_permissions(manage_messages=True)
-    async def delete(self, ctx, *args: str):
+    async def delete(self, ctx: Context, *args: str):
         await ctx.message.delete()
         del_ids = []
         del_list = []
@@ -506,7 +508,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
 
     @commands.command(name='move')
     @commands.bot_has_permissions(manage_messages=True)
-    async def move(self, ctx, where: str, who='any', msg_num: int = 1):
+    async def move(self, ctx: Context, where: str, who='any', msg_num: int = 1):
         channel = None
         for c in ctx.guild.text_channels:
             if where.lower() == c.name.lower():
@@ -563,7 +565,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             return await ctx.channel.delete_messages(msg_list)
 
     @commands.group(name='reload')
-    async def reload(self, ctx):
+    async def reload(self, _ctx: Context):
         self.logger.info('--- RELOAD START ---')
         self.logger.info(' -- Unloading cogs')
         self.bot.unload_all_extensions()
@@ -577,7 +579,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         self.logger.info('--- RELOAD END ---')
 
     @reload.command(name='cog')
-    async def reload_cog(self, ctx, cog_name: str = 'disabled_help'):
+    async def reload_cog(self, ctx: Context, cog_name: str):
         try:
             self.bot.unload_extension(f'cogs.{cog_name}')
         except Exception as e:
@@ -592,7 +594,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             return
 
     @commands.command(name='quit', brief="Kills the bot")
-    async def quit(self, ctx):
+    async def quit(self, _ctx: Context):
         return await self.bot.close()
 
 

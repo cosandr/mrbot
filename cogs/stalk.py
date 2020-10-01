@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import dateparser
 from discord.ext import commands
 
 from cogs.psql_collector import Collector
+from ext.context import Context
 from ext.internal import Channel, Guild, Message, User
 from ext.parsers import parsers
 from ext.utils import human_timedelta_short, transparent_embed
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Stalk(commands.Cog, name="Stalk"):
@@ -64,9 +69,8 @@ class Stalk(commands.Cog, name="Stalk"):
             parsers.Arg('--absolute', default=False, help='Use absolute times', action='store_true'),
         ],
     )
-    async def stalk(self, ctx, *args: str):
-        parsed = ctx.command.parser.parse_args(args)
-        search_user = ' '.join(parsed.user)
+    async def stalk(self, ctx: Context):
+        search_user = ' '.join(ctx.parsed.user)
         int_user = await User.from_search(ctx, search=search_user, with_nick=True, with_activity=True, with_status=True)
         user = await int_user.to_discord(ctx)
         if not user:
@@ -74,7 +78,7 @@ class Stalk(commands.Cog, name="Stalk"):
         embed = transparent_embed()
         time_format = '%H:%M:%S - %d.%m.%y'
         embed.title = f"Stalking {user.name}#{user.discriminator}\n"
-        if parsed.absolute:
+        if ctx.parsed.absolute:
             embed.set_footer(text="Time is in UTC, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
             embed.description = f"User created: {user.created_at.strftime(time_format)}\n"
             if hasattr(user, 'joined_at'):
@@ -141,7 +145,7 @@ class Stalk(commands.Cog, name="Stalk"):
                 if v is None or k not in ref:
                     continue
                 if isinstance(v, datetime):
-                    if parsed.absolute:
+                    if ctx.parsed.absolute:
                         ret_str += f'{ref[k].format(v.strftime(time_format))}\n'
                     else:
                         ret_str += f'{ref[k].format(human_timedelta_short(v))}\n'
@@ -165,14 +169,13 @@ class Stalk(commands.Cog, name="Stalk"):
             parsers.Arg('--all-bots', default=False, help='Show commands by all bots', action='store_true'),
         ],
     )
-    async def cmdstats(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
+    async def cmdstats(self, ctx: Context):
         user: Optional[User] = None
         q = f'SELECT name, COUNT(1) AS count FROM {Collector.psql_table_name_command_log} '
         title = 'Top {0} most used commands'
-        q_args = [parsed.limit]
-        if parsed.user:
-            search_user = ' '.join(parsed.user)
+        q_args = [ctx.parsed.limit]
+        if ctx.parsed.user:
+            search_user = ' '.join(ctx.parsed.user)
             user: User = await User.from_search(ctx, search=search_user)
             if not user:
                 return await ctx.send(f'No user {search_user} found')
@@ -182,11 +185,11 @@ class Stalk(commands.Cog, name="Stalk"):
             else:
                 q += f'AND user_id=${len(q_args)} '
             title += f' by {user.display_name}'
-        if parsed.since:
-            since: datetime = dateparser.parse(parsed.since)
+        if ctx.parsed.since:
+            since: datetime = dateparser.parse(ctx.parsed.since)
             if not since:
                 return await ctx.send('Cannot parse date/time')
-            title += f' since {parsed.since} ago'
+            title += f' since {ctx.parsed.since} ago'
             # Convert to UTC and make timezone naive again
             q_args.append(since.astimezone(tz=timezone.utc).replace(tzinfo=None))
             if 'WHERE' not in q:
@@ -195,14 +198,14 @@ class Stalk(commands.Cog, name="Stalk"):
                 q += f'AND time > ${len(q_args)} '
         else:
             title += ' of all time'
-        if not parsed.with_test:
+        if not ctx.parsed.with_test:
             if 'WHERE' not in q:
                 q += 'WHERE ch_id != 422473204515209226 '
             else:
                 q += 'AND ch_id != 422473204515209226 '
         else:
             title += ', including test channel'
-        if not parsed.all_bots:
+        if not ctx.parsed.all_bots:
             q_args.append(self.bot.user.id)
             if 'WHERE' not in q:
                 q += f'WHERE bot_id=${len(q_args)} '

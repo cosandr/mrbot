@@ -1,10 +1,15 @@
-from typing import List, Set
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Set
 
 from discord.ext import commands
 
 from ext import parsers
+from ext.context import Context
 from ext.utils import find_similar_str
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Help(commands.Cog):
@@ -24,12 +29,11 @@ class Help(commands.Cog):
             parsers.Arg('--hidden', default=False, action='store_true', help='Show hidden commands [owner only]'),
         ],
     )
-    async def help(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        search_commands: List[str] = parsed.commands
+    async def help(self, ctx: Context):
+        search_commands: List[str] = ctx.parsed.commands
         show_hidden = False
         owner_called = await self.bot.is_owner(ctx.author)
-        if parsed.hidden:
+        if ctx.parsed.hidden:
             if owner_called:
                 show_hidden = True
             else:

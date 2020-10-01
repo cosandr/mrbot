@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Tuple, Union, List, Optional
+from typing import TYPE_CHECKING, Tuple, Union, List, Optional
 
 import asyncpg
 import discord
-from discord.ext import commands
 
-from mrbot import MrBot
 from .base import Common
 from .guild import Guild
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Channel(Common):
@@ -47,7 +48,7 @@ class Channel(Common):
         q_args = [self.id, self.name, self.guild_id, self.voice]
         return q, q_args
 
-    def to_discord(self, bot: Union[MrBot, commands.Bot]) -> Union[discord.abc.GuildChannel, discord.abc.PrivateChannel]:
+    def to_discord(self, bot: MrBot) -> Union[discord.abc.GuildChannel, discord.abc.PrivateChannel]:
         return bot.get_channel(self.id)
 
     @classmethod

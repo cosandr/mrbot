@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 
 from discord.ext import commands
 
+from ext.context import Context
 from .errors import ArgParseError
 
 
@@ -25,6 +26,16 @@ class Command(commands.Command):
             for arg in parser_args:
                 self.parser.add_argument(*arg.args, **arg.kwargs)
 
+    async def prepare(self, ctx: Context) -> None:
+        await super().prepare(ctx)
+        if self.clean_params:
+            raise TypeError('Parser command should not have any arguments defined')
+        if not isinstance(self.parser, ArgumentParser):
+            raise TypeError(f'Command parser is of type {type(self.parser)} instead of ArgumentParser')
+        args = ctx.view.buffer[ctx.view.index:ctx.view.end].strip()
+        if args:
+            ctx.parsed = self.parser.parse_args(args.split())
+
 
 class Group(commands.Group, Command):
     def command(self, *args, **kwargs):
@@ -33,6 +44,7 @@ class Group(commands.Group, Command):
 
 
 class Arguments(ArgumentParser):
+    # noinspection PyProtectedMember
     def format_help(self):
         ret_str = f"{self.prog}\n\n"
         had_nargs = False

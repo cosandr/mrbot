@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import Tuple, Union, Optional, List
+from typing import TYPE_CHECKING, Tuple, Optional, List
 
 import asyncpg
 import discord
-from discord.ext import commands
 
-from mrbot import MrBot
 from .base import Common
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Guild(Common):
@@ -47,7 +48,7 @@ class Guild(Common):
             q += f' WHERE {where}'
         return q
 
-    def to_discord(self, bot: Union[MrBot, commands.Bot]) -> discord.Guild:
+    def to_discord(self, bot: MrBot) -> discord.Guild:
         return bot.get_guild(self.id)
 
     @classmethod

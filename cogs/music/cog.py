@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import ext.embed_helpers as emh
+from ext.context import Context
 from ext.errors import MissingConfigError
-from mrbot import MrBot
 from .checks import connect_voice_check, is_voice_check
 from .youtube import YouTube, get_stream_url
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Music(commands.Cog, name="YouTube Music"):
@@ -48,7 +54,7 @@ class Music(commands.Cog, name="YouTube Music"):
 
     @commands.group(brief='Play direct YT link or search for song name', invoke_without_command=True)
     @connect_voice_check()
-    async def alexa(self, ctx, *, name: str):
+    async def alexa(self, ctx: Context, *, name: str):
         if self.alexa_running.is_set():
             return await ctx.send("Alexa is already running.")
         # https://youtu.be/WgNIfnjr4t0
@@ -130,7 +136,7 @@ class Music(commands.Cog, name="YouTube Music"):
 
     @alexa.command(name='playlist', brief='Same but for playlists')
     @connect_voice_check()
-    async def alexa_playlist(self, ctx, *, name: str):
+    async def alexa_playlist(self, ctx: Context, *, name: str):
         if self.alexa_running.is_set():
             return await ctx.send(f"Alexa is already running.")
 
@@ -205,7 +211,7 @@ class Music(commands.Cog, name="YouTube Music"):
 
     @commands.command(brief='Show controls embed')
     @is_voice_check()
-    async def controls(self, ctx):
+    async def controls(self, ctx: Context):
         msg_content = "See !playlist for entire playlist."
         embed = emh.embed_init(self.bot, "Music Controls")
         embed.set_footer(text="Receiving commands.", icon_url=embed.footer.icon_url)
@@ -254,7 +260,7 @@ class Music(commands.Cog, name="YouTube Music"):
 
     @commands.command(name='volume', brief='Change volume, 0 to 100')
     @is_voice_check()
-    async def set_volume(self, ctx, volume: int):
+    async def set_volume(self, ctx: Context, volume: int):
         """Changes the player's volume"""
         self.volume = volume/100
         ctx.voice_client.source.volume = self.volume
@@ -262,16 +268,16 @@ class Music(commands.Cog, name="YouTube Music"):
 
     @commands.command(brief='Stop playing and clear playlist')
     @is_voice_check()
-    async def stop(self, ctx):
+    async def stop(self, ctx: Context):
         await self._stop()
 
     @commands.command(brief='Disconnect from voice channel')
-    async def dc(self, ctx):
+    async def dc(self, ctx: Context):
         await self._dc()
 
     @commands.command(brief='Display songs in song queue')
     @is_voice_check()
-    async def playlist(self, ctx):
+    async def playlist(self, ctx: Context):
         tmp = ""
         for song in self.get_song_queue():
             tmp += song + "\n"
@@ -282,7 +288,7 @@ class Music(commands.Cog, name="YouTube Music"):
 
     @commands.command(brief='Skip to specific song, see !playlist')
     @is_voice_check()
-    async def skip(self, ctx, index: int):
+    async def skip(self, ctx: Context, index: int):
         self.no_autoplay.set()
         if (index < 0) or (index >= len(self.song_queue)):
             return await ctx.send("Invalid song index.")
@@ -290,7 +296,7 @@ class Music(commands.Cog, name="YouTube Music"):
         await self._curr()
 
     @commands.command(brief='Switch bot voice channel')
-    async def join(self, ctx, *, channel=None):
+    async def join(self, ctx: Context, *, channel=None):
         """Joins/moves to caller voice channel if no arguments are given."""
         if channel is None:
             if ctx.author.voice is None:

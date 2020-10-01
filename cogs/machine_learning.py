@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import random
-from typing import Dict, Tuple, Optional
+from typing import TYPE_CHECKING, Dict, Tuple, Optional
 from urllib.parse import quote
 
 import discord
@@ -9,11 +11,14 @@ from discord.ext import commands
 
 import ext.embed_helpers as emh
 from ext.checks import open_connection_check
+from ext.context import Context
 from ext.errors import UnapprovedGuildError
 from ext.internal import Message
 from ext.parsers import parsers
 from ext.utils import find_similar_str, paginate, human_seconds, to_columns_vert
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class MachineLearning(commands.Cog, name="Machine Learning"):
@@ -22,7 +27,7 @@ class MachineLearning(commands.Cog, name="Machine Learning"):
         self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
 
-    async def cog_check(self, ctx):
+    async def cog_check(self, ctx: Context):
         if await self.bot.is_owner(ctx.author):
             return True
         # Ignore DMs
@@ -45,19 +50,18 @@ class MachineLearning(commands.Cog, name="Machine Learning"):
         ],
     )
     @open_connection_check()
-    async def be(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if parsed.words > 300 and not await self.bot.is_owner(ctx.author):
+    async def be(self, ctx: Context):
+        if ctx.parsed.words > 300 and not await self.bot.is_owner(ctx.author):
             return await ctx.send("Too many words requested, keep it under 300.")
         embed = emh.embed_init(self.bot, "Be")
-        embed.add_field(name="Model", value=parsed.model, inline=True)
-        embed.add_field(name="Words", value=parsed.words, inline=True)
-        embed.add_field(name="Temp", value=parsed.temperature, inline=True)
+        embed.add_field(name="Model", value=ctx.parsed.model, inline=True)
+        embed.add_field(name="Words", value=ctx.parsed.words, inline=True)
+        embed.add_field(name="Temp", value=ctx.parsed.temperature, inline=True)
         embed.set_footer(text="Brains", icon_url=embed.footer.icon_url)
         msg = await ctx.send(embed=embed)
-        params = dict(words=parsed.words, temp=str(parsed.temperature))
+        params = dict(words=ctx.parsed.words, temp=str(ctx.parsed.temperature))
         # Send run request
-        url = f'/be/run/{quote(parsed.model)}'
+        url = f'/be/run/{quote(ctx.parsed.model)}'
         r = await self.bot.brains_get_request(url, params=params)
         if not r.ok:
             return await msg.edit(embed=r.fail_embed(embed, "Server error"))
@@ -79,9 +83,8 @@ class MachineLearning(commands.Cog, name="Machine Learning"):
         ]
     )
     @open_connection_check()
-    async def be_list(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if parsed.filter == 'best':
+    async def be_list(self, ctx: Context):
+        if ctx.parsed.filter == 'best':
             r = await self.bot.brains_get_request('/be/list/best')
         else:
             r = await self.bot.brains_get_request('/be/list/all')
@@ -90,15 +93,15 @@ class MachineLearning(commands.Cog, name="Machine Learning"):
         # Process model names, remove exact name information
         all_models: Dict[str, dict] = {}
         for d in r.data:
-            if parsed.filter == 'best':
+            if ctx.parsed.filter == 'best':
                 all_models[d["name"].split("_", 1)[0]] = d
             else:
                 all_models[d["name"]] = d
-        if parsed.filter not in ('best', 'all'):
+        if ctx.parsed.filter not in ('best', 'all'):
             models_keys = list(all_models.keys())
-            close_keys = find_similar_str(parsed.filter, models_keys)
+            close_keys = find_similar_str(ctx.parsed.filter, models_keys)
             if not close_keys:
-                return await ctx.send(f'No models similar to {parsed.filter}')
+                return await ctx.send(f'No models similar to {ctx.parsed.filter}')
             # Remove irrelevant entries
             for k in models_keys:
                 if k not in close_keys:
@@ -146,17 +149,16 @@ while 40 means 40 words are considered at each step. 0 (default) is a
 special setting meaning no restrictions. 40 generally is a good value.""",
     )
     @open_connection_check()
-    async def gpt2_continue(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        params = vars(parsed)
+    async def gpt2_continue(self, ctx: Context):
+        params = vars(ctx.parsed)
         params_str = "Model: {model_name}\nWords: {length}\nTemperature: {temperature}\nDiversity: {top_k}\nSeed: {seed}"
-        if not parsed.raw_text:
+        if not ctx.parsed.raw_text:
             params.pop('raw_text')
             raw_text = random.choice(list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'))
         else:
             raw_text = ' '.join(params.pop('raw_text'))
         # Sanity checks
-        if parsed.length > 300 and not await self.bot.is_owner(ctx.author):
+        if ctx.parsed.length > 300 and not await self.bot.is_owner(ctx.author):
             return await ctx.send("Too many words requested, keep it under 300.")
         embed = emh.embed_init(self.bot, "Continue")
         embed.add_field(name="Parameters", value=params_str.format(**params), inline=True)
@@ -190,18 +192,17 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         ]
     )
     @open_connection_check()
-    async def gpt2_list(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
+    async def gpt2_list(self, ctx: Context):
         r = await self.bot.brains_get_request('/continue/list')
         if not r.ok:
             return await ctx.send(r.fail_msg)
         # Process model names, remove exact name information
         all_models: Dict[str, dict] = r.data
-        if parsed.filter != 'all':
+        if ctx.parsed.filter != 'all':
             models_keys = list(all_models.keys())
-            close_keys = find_similar_str(parsed.filter, models_keys)
+            close_keys = find_similar_str(ctx.parsed.filter, models_keys)
             if not close_keys:
-                return await ctx.send(f'No models similar to {parsed.filter}')
+                return await ctx.send(f'No models similar to {ctx.parsed.filter}')
             # Remove irrelevant entries
             for k in models_keys:
                 if k not in close_keys:
@@ -234,9 +235,8 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         ],
     )
     @open_connection_check()
-    async def hell(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        params = vars(parsed)
+    async def hell(self, ctx: Context):
+        params = vars(ctx.parsed)
         params['name_from'] = params.pop('category')
         await self.run_biggan(ctx, 'hell', params)
 
@@ -256,9 +256,8 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         ],
     )
     @open_connection_check()
-    async def slerp(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        params = vars(parsed)
+    async def slerp(self, ctx: Context):
+        params = vars(ctx.parsed)
         params['name_from'] = params.pop('category')
         await self.run_biggan(ctx, 'slerp', params)
 
@@ -279,13 +278,12 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         ],
     )
     @open_connection_check()
-    async def transform(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        await self.run_biggan(ctx, 'transform', vars(parsed))
+    async def transform(self, ctx: Context):
+        await self.run_biggan(ctx, 'transform', vars(ctx.parsed))
 
     @commands.command(name='whodis', brief='Machine learned guessing thing')
     @open_connection_check()
-    async def whodis(self, ctx, *args):
+    async def whodis(self, ctx: Context, *args):
         msg = await ctx.send('Generating thinking sounds...')
         check_models = {'andrei_3l128bi': 'Andrei',
                         'jens_3l128bi': 'Jens',
@@ -302,7 +300,7 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         return await msg.edit(content=tmp)
 
     @parsers.group(name='imagenet', brief='Image net group', invoke_without_command=False)
-    async def imagenet(self, ctx):
+    async def imagenet(self, ctx: Context):
         return
 
     @imagenet.command(
@@ -314,17 +312,16 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         ]
     )
     @open_connection_check()
-    async def imagenet_list(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if parsed.show_categories:
+    async def imagenet_list(self, ctx: Context):
+        if ctx.parsed.show_categories:
             r = await self.bot.brains_get_request('/image_label/list')
         else:
-            r = await self.bot.brains_get_request('/image_label/list', params=dict(category=parsed.category))
+            r = await self.bot.brains_get_request('/image_label/list', params=dict(category=ctx.parsed.category))
         if not r.ok:
             return await ctx.send(r.fail_msg)
-        if parsed.show_categories:
+        if ctx.parsed.show_categories:
             return await ctx.send(', '.join(sorted(r.data.keys())))
-        for p in paginate(to_columns_vert(r.data[parsed.category], sort=True)):
+        for p in paginate(to_columns_vert(r.data[ctx.parsed.category], sort=True)):
             await ctx.send(p)
 
     @imagenet.command(
@@ -338,18 +335,17 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         usage='Most recent image is used if no user or message ID is specified.'
     )
     @open_connection_check()
-    async def imagenet_run(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        source = ' '.join(parsed.source)
+    async def imagenet_run(self, ctx: Context):
+        source = ' '.join(ctx.parsed.source)
         cat_names = {
             "obj": "object type",
             "subs": "subreddit",
             "meme": "meme quality",
         }
-        embed = emh.embed_init(self.bot, f'Guess {cat_names[parsed.category]}')
+        embed = emh.embed_init(self.bot, f'Guess {cat_names[ctx.parsed.category]}')
         embed.title = 'Searching for image'
         if source:
-            embed.set_footer(text=f"Searching for image from {parsed.source}.", icon_url=embed.footer.icon_url)
+            embed.set_footer(text=f"Searching for image from {ctx.parsed.source}.", icon_url=embed.footer.icon_url)
         else:
             embed.set_footer(text=f"Searching for most recent image.", icon_url=embed.footer.icon_url)
         msg: discord.Message = await ctx.send(embed=embed)
@@ -359,7 +355,7 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         embed.title = f"{res.author.display_name}'s image found"
         embed.description = 'Feeding the machine.'
         await msg.edit(embed=embed)
-        r = await self.bot.brains_post_request('/image_label/run', data=dict(model_type=parsed.category, url=res.first_image))
+        r = await self.bot.brains_post_request('/image_label/run', data=dict(model_type=ctx.parsed.category, url=res.first_image))
         if not r.ok:
             return await msg.edit(embed=r.fail_embed(embed))
         results, labels = np.array(r.data['results']), r.data['labels']
@@ -370,7 +366,7 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         embed.set_footer(text=f"Completed in {human_seconds(r.time, num_units=1, precision=2)}", icon_url=embed.footer.icon_url)
         return await msg.edit(embed=embed)
 
-    async def run_biggan(self, ctx: commands.Context, cmd: str, params: dict):
+    async def run_biggan(self, ctx: Context, cmd: str, params: dict):
         # Get categories
         r = await self.bot.brains_get_request('/biggan/categories')
         if not r.ok:

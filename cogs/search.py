@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import json
 import time
+from typing import TYPE_CHECKING
 from urllib import parse
 
 from discord.ext import commands
 
 import ext.embed_helpers as emh
+from ext.context import Context
 from ext.errors import MissingConfigError
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Search(commands.Cog, name="Search"):
@@ -25,7 +31,7 @@ class Search(commands.Cog, name="Search"):
             raise MissingConfigError('Oxford API app key not found')
 
     @commands.command(name='def', brief="Search Oxford Dictionary")
-    async def oxford_def(self, ctx, word: str, lang: str = 'en'):
+    async def oxford_def(self, ctx: Context, word: str, lang: str = 'en'):
         start = time.perf_counter()
         url = f'https://od-api.oxforddictionaries.com/api/v2/entries/{lang}/{word.lower()}'
         async with self.bot.aio_sess.get(url=url, headers=self.headers) as resp:
@@ -58,7 +64,7 @@ class Search(commands.Cog, name="Search"):
         return await ctx.send(embed=embed)
 
     @commands.command(name='wiki', brief='Wikipedia search')
-    async def wiki(self, ctx, *, query: str):
+    async def wiki(self, ctx: Context, *, query: str):
         start = time.perf_counter()
         url = "https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&redirects=1"
         params = {'titles': query}

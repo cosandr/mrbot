@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import platform
+import re
 import signal
 import traceback
 from base64 import b64decode
@@ -16,6 +17,7 @@ from pkg_resources import get_distribution
 
 import config as cfg
 from ext.brains import Response, BrainsAPIError
+from ext.context import Context
 from ext.embed_helpers import embed_local_file
 from ext.errors import MissingConfigError
 from ext.utils import cleanup_http_params, human_seconds
@@ -31,7 +33,6 @@ class MrBot(commands.Bot):
         self.pool: Optional[asyncpg.pool.Pool] = None
         self._close_ran: bool = False
         self.cleanup_tasks: List[asyncio.Task] = []
-        self.exec_times: List[float] = []
         # --- Logger ---
         logger_fmt = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
         # Console Handler
@@ -59,14 +60,21 @@ class MrBot(commands.Bot):
         # --- Logger ---
         # --- Load stuff ---
         self.connect_task: asyncio.Task = self.loop.create_task(self.connect_sess())
-        self.extension_override = kwargs.pop('extension_override', None)
-        self.load_all_extensions()
+        self._extension_override = kwargs.pop('extension_override', None)
         if platform.system() != 'Windows':
             self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
             self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
         # Queue for message logger
         self.msg_queue = asyncio.PriorityQueue()
         self.psql_lock = asyncio.Lock()
+        # Prepare prefix regex
+        if isinstance(self.command_prefix, str):
+            check_prefix = [self.command_prefix]
+        else:
+            check_prefix = self.command_prefix
+        group = '|'.join(re.escape(p * 2) for p in check_prefix)
+        self._re_prefix_check = re.compile(f'^({group}).*')
+        self.load_all_extensions()
 
     def run(self, *args, **kwargs):
         super().run(self.config.token, *args, **kwargs)
@@ -117,12 +125,16 @@ class MrBot(commands.Bot):
         await super().close()
 
     async def on_message(self, message: discord.Message) -> None:
-        if message.author.id == self.user.id:
+        # Don't respond to bots
+        if message.author.bot:
             return
 
         # Only process commands starting with a single prefix
-        if not message.content.startswith(self.command_prefix * 2, 0, 2):
-            await self.process_commands(message)
+        # Maybe use prepared regex pattern?
+        if self._re_prefix_check.match(message.content):
+            return
+        ctx = await self.get_context(message, cls=Context)
+        await self.invoke(ctx)
 
     @staticmethod
     async def add_reaction_str(msg: discord.Message, in_str: str) -> None:
@@ -155,30 +167,13 @@ class MrBot(commands.Bot):
         if err_str != "":
             await msg.channel.send(err_str)
 
-    async def list_group_subcmds(self, ctx: commands.Context) -> discord.Message:
-        """Called when a group cannot be invoked without a subcommand.
-        Returns an embed with all available subcommands in the group.
-
-        :param ctx: The context from which the group was invoked
-        """
-        owner_called = await self.is_owner(ctx.author)
-        embed = discord.Embed()
-        embed.colour = discord.Colour.red()
-        embed.set_author(name=f"{ctx.command.name} cannot be called directly", icon_url=str(self.get_user(self.owner_id).avatar_url))
-        embed.title = "Available subcommands:"
-        for subcmd in ctx.command.commands:
-            if not owner_called and subcmd.hidden:
-                continue
-            embed.add_field(name=subcmd.name, value=subcmd.brief, inline=False)
-        return await ctx.send(embed=embed)
-
     def load_all_extensions(self, logger: logging.Logger = None) -> None:
         """Load all bot cogs in `cogs` folder, ignores files starting with `disabled`."""
         loaded = []
         skipped = []
         failed = []
-        if self.extension_override is not None:
-            to_load = self.extension_override
+        if self._extension_override is not None:
+            to_load = self._extension_override
         else:
             to_load = []
             for file in os.listdir('cogs'):

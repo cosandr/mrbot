@@ -4,6 +4,8 @@ from typing import Tuple, Union
 import discord
 from discord.ext import commands
 
+from ext.context import Context
+
 
 def embed_init(bot: commands.Bot, name: str) -> discord.Embed:
     """Create standardized embed with `name` as the author
@@ -45,7 +47,7 @@ async def embed_socket_err(msg: discord.Message, embed: discord.Embed, err: str)
     await msg.edit(embed=embed)
 
 
-async def embed_prev_generated(ctx: commands.Context, embed: discord.Embed, filename: str) -> discord.Message:
+async def embed_prev_generated(ctx: Context, embed: discord.Embed, filename: str) -> discord.Message:
     """Edit and send standardized file already exists embed.
 
     :param ctx: Context of invocation
@@ -61,7 +63,7 @@ async def embed_prev_generated(ctx: commands.Context, embed: discord.Embed, file
     return await ctx.send(content=url, embed=embed)
 
 
-async def embed_img_with_time(ctx: commands.Context, msg: discord.Message, embed: discord.Embed, filename: str, comp_time: float) -> None:
+async def embed_img_with_time(ctx: Context, msg: discord.Message, embed: discord.Embed, filename: str, comp_time: float) -> None:
     """Edit and send standardized completed image computation embed.
     Used to attach an image from `filename` parameter to the given `embed`.
 

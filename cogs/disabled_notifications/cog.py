@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 from ext import utils
-from mrbot import MrBot
 from .incoming import Incoming
 from .response import Response
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 LISTEN_HOST = '0.0.0.0'
 LISTEN_PORT = 6684

@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import itertools
 import logging
 import random
 import re
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -9,10 +12,13 @@ from emoji import EMOJI_UNICODE
 
 import config as cfg
 from ext import utils
+from ext.context import Context
 from ext.internal import Guild
 from ext.psql import create_table
 from ext.utils import get_channel_name
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Reactions(commands.Cog, name="Reaction"):
@@ -68,7 +74,7 @@ class Reactions(commands.Cog, name="Reaction"):
             self.react_weights[r['category']] = r['weight']
 
     @commands.group(name='reactions', brief='List link reactions', invoke_without_command=True)
-    async def reactions(self, ctx):
+    async def reactions(self, ctx: Context):
         q = f'SELECT category, react_list FROM {self.psql_table_name}'
         async with self.bot.pool.acquire() as con:
             results = await con.fetch(q)
@@ -81,7 +87,7 @@ class Reactions(commands.Cog, name="Reaction"):
         await ctx.send(f"```{ret_str}```")
 
     @reactions.command(name="add", brief="Add a link reaction")
-    async def reactions_add(self, ctx, reaction: str, category: str):
+    async def reactions_add(self, ctx: Context, reaction: str, category: str):
         if category not in self.react_list:
             await ctx.send("Invalid category.")
             return
@@ -96,7 +102,7 @@ class Reactions(commands.Cog, name="Reaction"):
         await self.load_reactions()
 
     @reactions.command(name="move", brief="Change link reaction category")
-    async def reactions_move(self, ctx, reaction: str, new_category: str):
+    async def reactions_move(self, ctx: Context, reaction: str, new_category: str):
         if new_category not in self.react_list:
             await ctx.send("Invalid category.")
             return
@@ -128,7 +134,7 @@ class Reactions(commands.Cog, name="Reaction"):
         await self.load_reactions()
 
     @reactions.command(name="del", brief="Delete a link reaction")
-    async def reactions_del(self, ctx, reaction: str):
+    async def reactions_del(self, ctx: Context, reaction: str):
         reaction = reaction.lower()
         valid = False
         category = None
@@ -146,7 +152,7 @@ class Reactions(commands.Cog, name="Reaction"):
         await self.load_reactions()
 
     @reactions.command(name="search", brief="Search for a link reaction")
-    async def reactions_search(self, ctx, reaction: str):
+    async def reactions_search(self, ctx: Context, reaction: str):
         if len(reaction) <= 1:
             await ctx.send(f"Be more specific.")
             return

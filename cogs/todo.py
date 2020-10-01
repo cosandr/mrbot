@@ -1,17 +1,23 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import logging
+from typing import TYPE_CHECKING
 
 import asyncpg
 import discord
 from discord.ext import commands
 
 import config as cfg
+from ext.context import Context
 from ext.internal import User
 from ext.parsers import parsers
 from ext.parsers.errors import ArgParseError
 from ext.psql import create_table, ensure_foreign_key, debug_query
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Todo(commands.Cog, name="Todo"):
@@ -74,9 +80,8 @@ class Todo(commands.Cog, name="Todo"):
             parsers.Arg('--done', '-d', default=False, help='Show done', action='store_true'),
         ],
     )
-    async def todo(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        q = self.create_list_query(parsed)
+    async def todo(self, ctx: Context):
+        q = self.create_list_query(ctx.parsed)
         async with self.bot.pool.acquire() as con:
             result = await con.fetch(q, ctx.author.id)
         if len(result) == 0:
@@ -165,13 +170,12 @@ class Todo(commands.Cog, name="Todo"):
             parsers.Arg('--extra', '-e', default=None, nargs='*', help='Extra information'),
         ],
     )
-    async def todo_add(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        add_prio = self.prio_to_num.get(parsed.priority.lower(), None)
-        title = ' '.join(parsed.title)
-        extra = ' '.join(parsed.extra) if parsed.extra is not None else None
+    async def todo_add(self, ctx: Context):
+        add_prio = self.prio_to_num.get(ctx.parsed.priority.lower(), None)
+        title = ' '.join(ctx.parsed.title)
+        extra = ' '.join(ctx.parsed.extra) if ctx.parsed.extra is not None else None
         if add_prio is None:
-            return await ctx.send((f"Unrecognized priority {parsed.priority}. "
+            return await ctx.send((f"Unrecognized priority {ctx.parsed.priority}. "
                                    f"Available priorities: `{self.prio_str}`."))
         async with self.bot.pool.acquire() as con:
             for _ in range(2):
@@ -201,31 +205,30 @@ class Todo(commands.Cog, name="Todo"):
             parsers.Arg('--extra', '-e', default=None, nargs='*', help='Extra information'),
         ],
     )
-    async def todo_edit(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if not await self.check_todo_item(ctx, parsed.index):
+    async def todo_edit(self, ctx: Context):
+        if not await self.check_todo_item(ctx, ctx.parsed.index):
             return
         q = f"UPDATE {self.psql_table_name} SET "
         q_args = []
         q_tmp = []
-        if parsed.priority:
-            add_prio = self.prio_to_num.get(parsed.priority.lower())
+        if ctx.parsed.priority:
+            add_prio = self.prio_to_num.get(ctx.parsed.priority.lower())
             if add_prio is None:
-                return await ctx.send((f"Unrecognized priority {parsed.priority}. "
+                return await ctx.send((f"Unrecognized priority {ctx.parsed.priority}. "
                                        f"Available priorities: `{self.prio_str}`."))
             q_args.append(add_prio)
             q_tmp.append(f"priority=${len(q_args)}")
-        if parsed.title:
-            q_args.append(' '.join(parsed.title))
+        if ctx.parsed.title:
+            q_args.append(' '.join(ctx.parsed.title))
             q_tmp.append(f"title=${len(q_args)}")
-        if parsed.extra:
-            q_args.append(' '.join(parsed.extra))
+        if ctx.parsed.extra:
+            q_args.append(' '.join(ctx.parsed.extra))
             q_tmp.append(f"extra=${len(q_args)}")
         if len(q_args) == 0:
             await ctx.send(f"You must specify something to edit.")
             return
         q += ','.join(q_tmp)
-        q_args.append(parsed.index)
+        q_args.append(ctx.parsed.index)
         q += f" WHERE id=${len(q_args)}"
         async with self.bot.pool.acquire() as con:
             try:
@@ -235,13 +238,13 @@ class Todo(commands.Cog, name="Todo"):
                 raise e
             # Fetch what we just added for display
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
-            res = await con.fetchrow(q, parsed.index)
+            res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
         embed.set_author(name="Todo Item Edit", icon_url=ctx.author.avatar_url)
         return await ctx.send(embed=embed)
 
     @todo.command(name='done', brief='Mark item as done from todo list by index')
-    async def todo_done(self, ctx, idx: int):
+    async def todo_done(self, ctx: Context, idx: int):
         if not await self.check_todo_item(ctx, idx):
             return
         async with self.bot.pool.acquire() as con:
@@ -255,7 +258,7 @@ class Todo(commands.Cog, name="Todo"):
         return await ctx.send(embed=embed)
 
     @todo.command(name='undo', brief='Mark item as undone from todo list by index')
-    async def todo_undo(self, ctx, idx: int):
+    async def todo_undo(self, ctx: Context, idx: int):
         if not await self.check_todo_item(ctx, idx):
             return
         async with self.bot.pool.acquire() as con:
@@ -269,7 +272,7 @@ class Todo(commands.Cog, name="Todo"):
         return await ctx.send(embed=embed)
 
     @todo.command(name='del', brief='Delete item from todo list by index')
-    async def todo_del(self, ctx, idx: int):
+    async def todo_del(self, ctx: Context, idx: int):
         if not await self.check_todo_item(ctx, idx):
             return
         async with self.bot.pool.acquire() as con:
@@ -283,7 +286,7 @@ class Todo(commands.Cog, name="Todo"):
         return await ctx.send(embed=embed)
 
     @todo.command(name='show', brief='Show single item by index')
-    async def todo_show(self, ctx, idx: int):
+    async def todo_show(self, ctx: Context, idx: int):
         if not await self.check_todo_item(ctx, idx):
             return
         async with self.bot.pool.acquire() as con:
@@ -301,9 +304,8 @@ class Todo(commands.Cog, name="Todo"):
             parsers.Arg('--done', '-d', default=False, help='Show done', action='store_true'),
         ],
     )
-    async def todo_list(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        q = self.create_list_query(parsed)
+    async def todo_list(self, ctx: Context):
+        q = self.create_list_query(ctx.parsed)
         async with self.bot.pool.acquire() as con:
             result = await con.fetch(q, ctx.author.id)
         if len(result) == 0:
@@ -352,7 +354,7 @@ class Todo(commands.Cog, name="Todo"):
                         inline=False)
         return embed
 
-    async def check_todo_item(self, ctx, idx: int):
+    async def check_todo_item(self, ctx: Context, idx: int):
         """Check whether or not given item is from the author"""
         async with self.bot.pool.acquire() as con:
             q = f"SELECT count(1) FROM {self.psql_table_name} WHERE id=$1"

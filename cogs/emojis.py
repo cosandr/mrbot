@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import re
@@ -5,7 +7,7 @@ import traceback
 from asyncio import TimeoutError
 from collections import namedtuple
 from io import BytesIO
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import discord
 from PIL import Image
@@ -13,9 +15,12 @@ from discord.ext import commands
 from jellyfish import jaro_winkler_similarity
 
 from ext import utils
+from ext.context import Context
 from ext.errors import UnapprovedGuildError
 from ext.internal import Message
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Emojis(commands.Cog, name="Emojis"):
@@ -33,7 +38,7 @@ class Emojis(commands.Cog, name="Emojis"):
         if not os.path.exists(self.disk_cache):
             os.mkdir(self.disk_cache, 0o755)
 
-    async def cog_check(self, ctx):
+    async def cog_check(self, ctx: Context):
         if await self.bot.is_owner(ctx.author):
             return True
         # Ignore DMs
@@ -46,14 +51,14 @@ class Emojis(commands.Cog, name="Emojis"):
         return True
 
     @commands.group(name='emoji', brief='Emoji command group', invoke_without_command=True)
-    async def emoji(self, ctx, name: str):
+    async def emoji(self, ctx: Context, name: str):
         ok = await self.send_emoji(name, ctx.message.channel)
         if ok:
             return
         return await ctx.send(f'No emoji similar to {name} found')
 
     @emoji.command(name='import', brief='Import emoji, will be resized')
-    async def emoji_import(self, ctx, name: str):
+    async def emoji_import(self, ctx: Context, name: str):
         if utils.re_url.search(name) is not None:
             return await ctx.send('No name provided.')
         # Make sure it doesn't already exist
@@ -98,7 +103,7 @@ class Emojis(commands.Cog, name="Emojis"):
         return await msg.edit(content=f'Added {em.name} emoji.', embed=embed)
 
     @emoji.command(name='list', brief='List all available emoji')
-    async def emoji_list(self, ctx, name: str=None):
+    async def emoji_list(self, ctx: Context, name: str = None):
         # Get list of all emojis
         all_emojis = set([em.name for em in self.bot.emojis])
         for file in os.listdir(self.disk_cache):
@@ -113,7 +118,7 @@ class Emojis(commands.Cog, name="Emojis"):
         return await ctx.send("```" + utils.to_columns_vert(all_emojis, num_cols=4, sort=True) + "```")
 
     @emoji.command(name='del', brief='Delete an emoji, must be on disk')
-    async def emoji_del(self, ctx, name: str):
+    async def emoji_del(self, ctx: Context, name: str):
         em = self.find_file_emoji(name, loose=False)
         if em is None:
             return await ctx.send(f'No emoji `{name}` found.')
@@ -130,7 +135,7 @@ class Emojis(commands.Cog, name="Emojis"):
         try:
             await self.bot.wait_for('reaction_add', timeout=5.0, check=check)
         except TimeoutError:
-            embed.description = 'Deletion uncofirmed'
+            embed.description = 'Deletion unconfirmed'
             return await msg.edit(embed=embed)
         try:
             os.unlink(f'{self.disk_cache}/{em.filename}')

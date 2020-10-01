@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import itertools
 import logging
+from typing import TYPE_CHECKING
 
 import asyncpg
 import discord
 from discord.ext import commands
 
 import config as cfg
+from ext.context import Context
 from ext.errors import UnapprovedGuildError
 from ext.internal import Message
 from ext.psql import create_table, debug_query
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Stars(commands.Cog, name='Stars'):
@@ -41,7 +47,7 @@ class Stars(commands.Cog, name='Stars'):
         async with self.bot.psql_lock:
             await create_table(self.bot.pool, names, q, self.logger)
 
-    async def cog_check(self, ctx):
+    async def cog_check(self, ctx: Context):
         if await self.bot.is_owner(ctx.author):
             return True
         # Ignore DMs
@@ -50,7 +56,7 @@ class Stars(commands.Cog, name='Stars'):
         return True
 
     @commands.group(name='stars', brief='Top starred messages', invoke_without_command=True)
-    async def stars(self, ctx: commands.Context):
+    async def stars(self, ctx: Context):
         embed = discord.Embed()
         async with self.bot.pool.acquire() as con:
             res = await con.fetch(f'SELECT msg_id, posted_id, count FROM {self.psql_table_name} ORDER BY count DESC LIMIT 10')
@@ -68,7 +74,7 @@ class Stars(commands.Cog, name='Stars'):
 
     @commands.has_permissions(administrator=True)
     @stars.command(name='add', brief='Immediately add message to starred list')
-    async def stars_add(self, ctx: commands.Context, msg_id: int):
+    async def stars_add(self, ctx: Context, msg_id: int):
         msg: Message = await Message.from_id(self.bot, msg_id, ctx.channel.id)
         if not msg:
             return await ctx.send(f'Message with ID {msg_id} not found.')
@@ -79,7 +85,7 @@ class Stars(commands.Cog, name='Stars'):
 
     @commands.has_permissions(administrator=True)
     @stars.command(name='rm', brief='Immediately remove message from starred list')
-    async def stars_rm(self, ctx: commands.Context, msg_id: int):
+    async def stars_rm(self, ctx: Context, msg_id: int):
         posted_id: int = await self.bot.pool.fetchval(f'SELECT posted_id FROM {self.psql_table_name} WHERE msg_id=$1', msg_id)
         if posted_id is None:
             return await ctx.send(f'Message with ID {msg_id} not starred.')

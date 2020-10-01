@@ -1,18 +1,23 @@
+from __future__ import annotations
+
 import itertools
 import logging
 import re
-from typing import List
+from typing import TYPE_CHECKING, List
 
 import discord
 from discord.ext import commands
 
 from config import TIME_FORMAT
 from ext import utils
+from ext.context import Context
 from ext.internal import Message, User, Guild
 from ext.parsers import parsers
 from ext.psql import create_table, try_run_query
-from mrbot import MrBot
 from .pasta import Pasta
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class PastaCog(commands.Cog, name="Pasta"):
@@ -42,32 +47,33 @@ class PastaCog(commands.Cog, name="Pasta"):
             parsers.Arg('--all', default=False, help='Include pasta for which you lack permissions', action='store_true'),
         ],
     )
-    async def pasta(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
+    async def pasta(self, ctx: Context):
         q = Pasta.make_psql_query_full(where='p.name=$1')
-        res = await self.bot.pool.fetchrow(q, parsed.name)
+        res = await self.bot.pool.fetchrow(q, ctx.parsed.name)
         if p := Pasta.from_psql_res(res):
             return await p.maybe_send(ctx)
-        all_pasta = await self.list_all_pasta_names(ctx, parsed.all)
+        all_pasta = await self.list_all_pasta_names(ctx, ctx.parsed.all)
         if not all_pasta:
             return await ctx.send('No pastas available.')
 
-        if meant := utils.find_similar_str(parsed.name, all_pasta):
-            return await ctx.send(f'Pasta `{parsed.name}` not found, did you mean: {self.format_pasta_names(meant, question=True)}')
+        if meant := utils.find_similar_str(ctx.parsed.name, all_pasta):
+            return await ctx.send(f'Pasta `{ctx.parsed.name}` not found, did you mean: {self.format_pasta_names(meant, question=True)}')
 
-        return await ctx.send(f'Pasta `{parsed.name}` not found, all available pasta: {self.format_pasta_names(all_pasta)}')
+        return await ctx.send(f'Pasta `{ctx.parsed.name}` not found, all available pasta: {self.format_pasta_names(all_pasta)}')
 
     @pasta.command(
         name='info',
         brief='Display pasta info',
+        parser_args=[
+            parsers.Arg('name', type=str.lower, help='Pasta name'),
+        ],
     )
-    async def pasta_info(self, ctx: commands.Context, name: str):
-        name = name.lower()
+    async def pasta_info(self, ctx: Context):
         q = Pasta.make_psql_query_full(where='p.name=$1')
-        res = await self.bot.pool.fetchrow(q, name)
+        res = await self.bot.pool.fetchrow(q, ctx.parsed.name)
         p = Pasta.from_psql_res(res)
         if not p:
-            return await ctx.send(f'No pasta {name} found.')
+            return await ctx.send(f'No pasta {ctx.parsed.name} found.')
         if not p.check_permissions(ctx):
             p.content = "HIDDEN"
         return await ctx.send(embed=self.embed_pasta_info(p))
@@ -81,19 +87,18 @@ class PastaCog(commands.Cog, name="Pasta"):
             parsers.Arg('--all', default=False, help='Include pasta for which you lack permissions', action='store_true'),
         ],
     )
-    async def pasta_list(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        all_pasta = await self.list_all_pasta_names(ctx, parsed.all)
+    async def pasta_list(self, ctx: Context):
+        all_pasta = await self.list_all_pasta_names(ctx, ctx.parsed.all)
         if not all_pasta:
             return await ctx.send('No pastas available.')
         # No search requested, list all
-        if not parsed.name:
+        if not ctx.parsed.name:
             return await ctx.send(f'Available pastas: {self.format_pasta_names(all_pasta)}')
 
-        if meant := utils.find_similar_str(parsed.name, all_pasta):
-            return await ctx.send(f'{utils.fmt_plural_str(len(meant), "pasta")} similar to `{parsed.name}` found: {self.format_pasta_names(meant)}')
+        if meant := utils.find_similar_str(ctx.parsed.name, all_pasta):
+            return await ctx.send(f'{utils.fmt_plural_str(len(meant), "pasta")} similar to `{ctx.parsed.name}` found: {self.format_pasta_names(meant)}')
 
-        await ctx.send(f'No pasta close to `{parsed.name}` found.')
+        await ctx.send(f'No pasta close to `{ctx.parsed.name}` found.')
 
     @pasta.command(
         name='add',
@@ -107,32 +112,31 @@ class PastaCog(commands.Cog, name="Pasta"):
             parsers.Arg('--no-guild', default=False, help='Do not register pasta with the current guild', action='store_true'),
         ],
     )
-    async def pasta_add(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if not parsed.content and not parsed.message_id:
+    async def pasta_add(self, ctx: Context):
+        if not ctx.parsed.content and not ctx.parsed.message_id:
             return await ctx.send('Provide content or message IDs')
         q = Pasta.make_psql_query_full(where='p.name=$1')
-        res = await self.bot.pool.fetchrow(q, parsed.name)
+        res = await self.bot.pool.fetchrow(q, ctx.parsed.name)
         if p := Pasta.from_psql_res(res):
-            return await ctx.send(f'Pasta {parsed.name} already exists.', embed=self.embed_pasta_info(p))
+            return await ctx.send(f'Pasta {ctx.parsed.name} already exists.', embed=self.embed_pasta_info(p))
         # Did we get content directly?
-        if parsed.content:
-            content = ' '.join(parsed.content)
+        if ctx.parsed.content:
+            content = ' '.join(ctx.parsed.content)
         # Construct pasta from ID's
         else:
             content = ''
-            for msg_id in parsed.message_id:
+            for msg_id in ctx.parsed.message_id:
                 msg = await Message.from_id(self.bot, msg_id, ctx.channel.id)
                 if not msg:
                     return await ctx.send(f"No message with ID {msg_id} found.")
                 content += msg.content
         user = None
-        if not parsed.no_user:
+        if not ctx.parsed.no_user:
             user = User.from_discord(ctx.author)
         guild = None
-        if not parsed.no_guild:
+        if not ctx.parsed.no_guild:
             guild = Guild.from_discord(ctx.guild)
-        p = Pasta(name=parsed.name, content=content, user=user, guild=guild)
+        p = Pasta(name=ctx.parsed.name, content=content, user=user, guild=guild)
         async with self.bot.pool.acquire() as con:
             async with con.transaction():
                 q, q_args = p.to_psql()
@@ -143,26 +147,29 @@ class PastaCog(commands.Cog, name="Pasta"):
         name='del',
         aliases=['delete', 'remove', 'rem'],
         brief='Delete a pasta',
+        parser_args=[
+            parsers.Arg('name', type=str.lower, help='Pasta name'),
+        ],
     )
-    async def pasta_del(self, ctx: commands.Context, name: str):
-        name = name.lower()
+    async def pasta_del(self, ctx: Context):
         q = Pasta.make_psql_query_full(where='p.name=$1')
-        res = await self.bot.pool.fetchrow(q, name)
+        res = await self.bot.pool.fetchrow(q, ctx.parsed.name)
         p = Pasta.from_psql_res(res)
         if not p:
-            return await ctx.send(f'No pasta {name} found.')
+            return await ctx.send(f'No pasta {ctx.parsed.name} found.')
         if err := p.edit_error(ctx):
             return await ctx.send(err)
         async with self.bot.pool.acquire() as con:
             async with con.transaction():
                 q = f"DELETE FROM {Pasta.psql_table_name} WHERE name=$1"
-                await con.execute(q, name)
+                await con.execute(q, ctx.parsed.name)
         return await ctx.send('Pasta removed.', embed=self.embed_pasta_info(p))
 
     @pasta.command(
         name='edit',
         brief='Edit a pasta',
         parser_args=[
+            parsers.Arg('target', type=str.lower, help='Pasta name'),
             parsers.Arg('-n', '--name', type=str.lower, help='Change name'),
             parsers.Arg('-c', '--content', nargs='*', help='Change content'),
             parsers.Arg('-m', '--message-id', type=int, action='append', help='Use content from message IDs'),
@@ -170,45 +177,44 @@ class PastaCog(commands.Cog, name="Pasta"):
             parsers.Arg('-g', '--guild-id', type=int, help='Change guild, use 0 to remove'),
         ],
     )
-    async def pasta_edit(self, ctx: commands.Context, name: str, *args):
-        parsed = ctx.command.parser.parse_args(args)
+    async def pasta_edit(self, ctx: Context):
         q = Pasta.make_psql_query_full(where='p.name=$1')
-        res = await self.bot.pool.fetchrow(q, name)
+        res = await self.bot.pool.fetchrow(q, ctx.parsed.target)
         p = Pasta.from_psql_res(res)
         if not p:
-            return await ctx.send(f'No pasta {name} found.')
+            return await ctx.send(f'No pasta {ctx.parsed.target} found.')
         if err := p.edit_error(ctx):
             return await ctx.send(err)
         new_p = p.copy()
         # Check if new name already exists
-        if parsed.name:
+        if ctx.parsed.name:
             q = f'SELECT count(1) FROM {Pasta.psql_table_name} WHERE name=$1'
-            if await self.bot.pool.fetchval(q, parsed.name):
-                return await ctx.send(f'Pasta with name {parsed.name} is already registered.')
-            new_p.name = parsed.name
-        if parsed.content:
-            new_p.content = ' '.join(parsed.content)
+            if await self.bot.pool.fetchval(q, ctx.parsed.name):
+                return await ctx.send(f'Pasta with name {ctx.parsed.name} is already registered.')
+            new_p.name = ctx.parsed.name
+        if ctx.parsed.content:
+            new_p.content = ' '.join(ctx.parsed.content)
         # Construct pasta from ID's
-        elif parsed.message_id:
+        elif ctx.parsed.message_id:
             new_p.content = ''
-            for msg_id in parsed.message_id:
+            for msg_id in ctx.parsed.message_id:
                 msg = await Message.from_id(self.bot, msg_id, ctx.channel.id)
                 if not msg:
                     return await ctx.send(f"No message with ID {msg_id} found.")
                 new_p.content += msg.content
         user = None
-        if parsed.user is not None:
-            if parsed.user:
-                user = await User.from_search(ctx, parsed.user)
+        if ctx.parsed.user is not None:
+            if ctx.parsed.user:
+                user = await User.from_search(ctx, ctx.parsed.user)
                 if not user:
-                    return await ctx.send(f'No user {parsed.user} found')
+                    return await ctx.send(f'No user {ctx.parsed.user} found')
             new_p.user = user
         guild = None
-        if parsed.guild_id is not None:
-            if parsed.guild_id:
-                d_guild = discord.utils.find(lambda g: g.id == parsed.guild_id, self.bot.guilds)
+        if ctx.parsed.guild_id is not None:
+            if ctx.parsed.guild_id:
+                d_guild = discord.utils.find(lambda g: g.id == ctx.parsed.guild_id, self.bot.guilds)
                 if not d_guild:
-                    return await ctx.send(f'The bot is not a member of any guild with ID {parsed.guild_id}')
+                    return await ctx.send(f'The bot is not a member of any guild with ID {ctx.parsed.guild_id}')
                 guild = Guild.from_discord(d_guild)
             new_p.guild = guild
         if p == new_p:
@@ -217,11 +223,11 @@ class PastaCog(commands.Cog, name="Pasta"):
             async with con.transaction():
                 # Delete old entry
                 q = f"DELETE FROM {Pasta.psql_table_name} WHERE name=$1"
-                await con.execute(q, name)
+                await con.execute(q, ctx.parsed.target)
                 # Add new entry
                 q, q_args = new_p.to_psql()
                 await try_run_query(con, q, q_args, self.logger, user=user, guild=guild)
-        return await ctx.send(f'{name} edited', embed=self.embed_pasta_info(new_p))
+        return await ctx.send(f'{ctx.parsed.target} edited', embed=self.embed_pasta_info(new_p))
 
     @staticmethod
     def embed_pasta_info(p: Pasta, max_content_len=50) -> discord.Embed:
@@ -259,7 +265,7 @@ class PastaCog(commands.Cog, name="Pasta"):
             all_pastas.append(Pasta.from_psql_res(r))
         return all_pastas
 
-    async def list_all_pasta_names(self, ctx: commands.Context, all_=False):
+    async def list_all_pasta_names(self, ctx: Context, all_=False):
         all_pastas = await self.get_all_pasta()
         names = []
         for p in all_pastas:

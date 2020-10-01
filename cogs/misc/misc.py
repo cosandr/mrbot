@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import json
@@ -11,6 +13,7 @@ import unicodedata
 import uuid
 from datetime import datetime, timedelta
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import asyncpg
 import discord
@@ -25,12 +28,15 @@ from sympy import preview
 import config as cfg
 import ext.embed_helpers as emh
 from ext import utils
+from ext.context import Context
 from ext.errors import MissingConfigError
 from ext.internal import Message, User
 from ext.parsers import parsers
 from ext.psql import create_table
 from ext.utils import pg_connection
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Misc(commands.Cog, name="Miscellaneous"):
@@ -92,7 +98,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
     @commands.bot_has_permissions(manage_roles=True)
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.guild_only()
-    async def set_role_colour(self, ctx: commands.Context, *, colour: str):
+    async def set_role_colour(self, ctx: Context, *, colour: str):
         g_def = self.bot.config.guilds.get(ctx.guild.id)
         if not g_def:
             return await ctx.send("This guild has no role definitions, cannot use this command.")
@@ -121,7 +127,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         await ctx.send(f'{m_def.name} colour changed to {colour}')
 
     @commands.command(name='msglen', brief='Msg length histogram')
-    async def msg_length(self, ctx, member: str):
+    async def msg_length(self, ctx: Context, member: str):
         user: User = await User.from_search(ctx, member)
         if not user:
             return await ctx.send(f'No user {member} found')
@@ -176,13 +182,12 @@ class Misc(commands.Cog, name="Miscellaneous"):
             parsers.Arg('--limit', '-l', default=25, type=int, help='Result limit'),
         ],
     )
-    async def msg_words(self, ctx, *args: str):
-        parsed = ctx.command.parser.parse_args(args)
-        search_user = " ".join(parsed.user)
+    async def msg_words(self, ctx: Context):
+        search_user = " ".join(ctx.parsed.user)
         user: User = await User.from_search(ctx, search_user)
         if not user:
             return await ctx.send(f'No user {search_user} found')
-        if parsed.words:
+        if ctx.parsed.words:
             q = ("SELECT regexp_split_to_table(LOWER(subq.content), '\\s') AS words FROM "
                  f"(SELECT content FROM {Message.psql_table_name} WHERE user_id=$1) AS subq")
         else:
@@ -203,7 +208,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
                 word_counts[word] += 1
         s = [(k, word_counts[k]) for k in sorted(word_counts, key=word_counts.get, reverse=True)]
         adj_s = []
-        adj_lim = parsed.limit if len(s) > parsed.limit else len(s)
+        adj_lim = ctx.parsed.limit if len(s) > ctx.parsed.limit else len(s)
         for i in range(adj_lim):
             if s[i][1] <= 1:
                 break
@@ -211,7 +216,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         text_colour = 'xkcd:grey'
         word, frequency = zip(*adj_s)
         indices = np.arange(len(adj_s))
-        if parsed.words:
+        if ctx.parsed.words:
             fig = plt.figure(figsize=(5, 10))
         else:
             fig = plt.figure(figsize=(10, 10))
@@ -239,7 +244,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         tmp = BytesIO()
         plt.savefig(tmp, facecolor=ax.get_facecolor(), bbox_inches='tight', format='png')
         tmp.seek(0)
-        if parsed.words:
+        if ctx.parsed.words:
             ret_str = f'Showing the {len(adj_s)} most commonly used words.\n'
         else:
             ret_str = f'Showing the {len(adj_s)} most commonly sent messages.\n'
@@ -256,17 +261,16 @@ class Misc(commands.Cog, name="Miscellaneous"):
             parsers.Arg('--use-public', default=False, help='Use public pool', action='store_true'),
         ],
     )
-    async def sql(self, ctx, *args: str):
-        parsed = ctx.command.parser.parse_args(args)
+    async def sql(self, ctx: Context):
         # remove ```sql\n```
-        if parsed.cmd[0] == '```' and parsed.cmd[-1] == '```':
-            cmd = '\n'.join(parsed.cmd[1:-1])
+        if ctx.parsed.cmd[0] == '```' and ctx.parsed.cmd[-1] == '```':
+            cmd = '\n'.join(ctx.parsed.cmd[1:-1])
         else:
-            cmd = '\n'.join(parsed.cmd)
+            cmd = '\n'.join(ctx.parsed.cmd)
 
         fetch_cmd = False
         running_live = False
-        if await self.bot.is_owner(ctx.author) and not parsed.use_public:
+        if await self.bot.is_owner(ctx.author) and not ctx.parsed.use_public:
             con = await self.bot.pool.acquire()
             running_live = True
             print("Running live")
@@ -275,7 +279,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
             print("Running public")
 
         if any(c in cmd.upper() for c in ['DROP', 'DELETE']):
-            msg = await ctx.send(f"Confirm destructive operation.")
+            msg = await ctx.send("Confirm destructive operation.")
             react_emoji = '✅'
             await msg.add_reaction(react_emoji)
 
@@ -355,11 +359,11 @@ class Misc(commands.Cog, name="Miscellaneous"):
         await ctx.send(f'```\n{ret_str}\n{row_str}\n\n{exec_time}\n```')
 
     @commands.command(name='roll', brief='Roll a number', aliases=['dice'])
-    async def num_roll(self, ctx, val: int):
+    async def num_roll(self, ctx: Context, val: int):
         await ctx.send(random.randint(0, val))
 
     @commands.command(name='charinfo', brief='Display unicode character info')
-    async def charinfo(self, ctx, *, characters: str):
+    async def charinfo(self, ctx: Context, *, characters: str):
         def to_string(c):
             digit = f'{ord(c):x}'
             name = unicodedata.name(c, 'Name not found.')
@@ -404,23 +408,23 @@ class Misc(commands.Cog, name="Miscellaneous"):
                 self.logger.info("Stream token removed.")
 
     @commands.group(name='d2', brief='Dota 2 command group')
-    async def dota2(self, ctx):
+    async def dota2(self, ctx: Context):
         if ctx.invoked_subcommand is None:
-            return await self.bot.list_group_subcmds(ctx)
+            return await ctx.list_group_subcmds()
 
     @dota2.before_invoke
-    async def dota2_get_heroes(self, ctx):
+    async def dota2_get_heroes(self, ctx: Context):
         if self.dota2_heroes is None:
             resp_bytes = await utils.bytes_from_url("https://api.opendota.com/api/heroes", self.bot.aio_sess)
             self.dota2_heroes = json.load(resp_bytes)
 
     @dota2.command(name='random', brief="Randoms a Dota 2 hero")
-    async def dota2_random(self, ctx):
+    async def dota2_random(self, ctx: Context):
         hero = random.choice(self.dota2_heroes)
         return await ctx.send(embed=self.dota2_hero_embed(ctx, hero))
 
     @dota2.command(name='legs', brief="Randoms a hero with at least given leg count")
-    async def dota2_legs(self, ctx, legs: int):
+    async def dota2_legs(self, ctx: Context, legs: int):
         hero_list = []
         for hero in self.dota2_heroes:
             if hero['legs'] >= legs:
@@ -430,7 +434,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         return await ctx.send(embed=self.dota2_hero_embed(ctx, random.choice(hero_list)))
 
     @commands.command(brief='Evaluate input as LaTeX and output image')
-    async def latex(self, ctx, *expr):
+    async def latex(self, ctx: Context, *expr):
         embed = emh.embed_init(self.bot, "LaTeX")
         embed.set_footer(text="Brains", icon_url=embed.footer.icon_url)
         embed.description = f"Input `{' '.join(expr)}`"
@@ -457,7 +461,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         return await ctx.send(file=f, embed=embed)
 
     @commands.command(name='wolf', brief='New Wolfram Alpha query')
-    async def wolf(self, ctx, *args):
+    async def wolf(self, ctx: Context, *args):
         q_wolf = ' '.join(args)
         if len(q_wolf) < 1:
             return await ctx.send('No input given.')
@@ -482,7 +486,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         return await msg.edit(embed=embed)
 
     @commands.group(brief='Link RL VOD', invoke_without_command=True)
-    async def rl(self, ctx, *name):
+    async def rl(self, ctx: Context, *name):
         if len(name) == 0:
             return await ctx.send(f"No VOD specified. Check `{ctx.prefix}rl list` or `{ctx.prefix}rl list all`.")
         else:
@@ -526,13 +530,13 @@ class Misc(commands.Cog, name="Miscellaneous"):
         return await ctx.send(f"VOD {name} not found, did you mean: {ret_str}")
 
     @rl.command(name='list', brief='List available RL VODs')
-    async def rl_list(self, ctx, show_all=None):
+    async def rl_list(self, ctx: Context, show_all=None):
         if show_all is not None and show_all == 'all':
             return await self.get_uuid_name_list(ctx, 'rl', list_all=True)
         return await self.get_uuid_name_list(ctx, 'rl', list_all=False)
 
     @commands.group(brief='Link one of Dre\'s clips', invoke_without_command=True)
-    async def clip(self, ctx, *name):
+    async def clip(self, ctx: Context, *name):
         if len(name) == 0:
             return await ctx.send(f"No clip specified. Check `{ctx.prefix}clip list` or `{ctx.prefix}clip list all`.")
         else:
@@ -573,14 +577,14 @@ class Misc(commands.Cog, name="Miscellaneous"):
         return await ctx.send(f"Clip {name} not found, did you mean: {ret_str}")
 
     @clip.command(name='list', brief='List available vidya clips')
-    async def clip_list(self, ctx, list_all=None):
+    async def clip_list(self, ctx: Context, list_all=None):
         if list_all == 'all':
             return await self.get_uuid_name_list(ctx, 'clips', True)
         return await self.get_uuid_name_list(ctx, 'clips', False)
 
     @commands.command(name='react', brief="Add reaction to last message")
     @commands.bot_has_permissions(manage_messages=True)
-    async def add_react(self, ctx, text: str, msg_id: int = None):
+    async def add_react(self, ctx: Context, text: str, msg_id: int = None):
         if msg_id is not None:
             try:
                 msg = await ctx.fetch_message(msg_id)
@@ -589,10 +593,10 @@ class Misc(commands.Cog, name="Miscellaneous"):
         else:
             msg = await ctx.history(limit=2, before=ctx.message).get()
         await ctx.message.delete()
-        await ctx.add_reaction_str(text)
+        await self.bot.add_reaction_str(msg, text)
 
     @commands.command(name='stream', brief="Post Dre's livestream link")
-    async def stream(self, ctx):
+    async def stream(self, ctx: Context):
         live_path = '/mnt/hls/live.m3u8'
         is_live = False
         if os.path.exists(live_path):
@@ -612,14 +616,14 @@ class Misc(commands.Cog, name="Miscellaneous"):
             return await ctx.send(f"Dre stream is offline.")
 
     @commands.command(name='thank', hidden=True)
-    async def thank(self, ctx):
+    async def thank(self, ctx: Context):
         return await ctx.send(f"{cfg.EMOJI_DICT['n']} {cfg.EMOJI_DICT['o']} {cfg.EMOJI_DICT['!']}")
 
     @commands.command(name='monbaguette', brief='Good meme')
-    async def monbaguette(self, ctx):
+    async def monbaguette(self, ctx: Context):
         return await ctx.send(embed=discord.Embed().set_image(url='https://pbs.twimg.com/media/DDg_fOaVYAAL_tP.jpg'))
 
-    async def get_uuid_name_list(self, ctx, list_type='rl', list_all=False):
+    async def get_uuid_name_list(self, ctx: Context, list_type='rl', list_all=False):
         """Fetches and returns a list of clips of given type from PSQL DB"""
         clip_list = []
         if list_all:
@@ -660,7 +664,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
                 self.logger.info("[BTN] Task cancelled.")
                 break
 
-    def dota2_hero_embed(self, ctx, hero):
+    def dota2_hero_embed(self, ctx: Context, hero):
         attr_names = {'agi': 'Agility',
                       'str': 'Strength',
                       'int': 'Intelligence'}

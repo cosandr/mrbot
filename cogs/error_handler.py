@@ -8,12 +8,13 @@ import discord
 
 from cogs.music.errors import *
 from ext.brains.errors import *
+from ext.context import Context
 from ext.errors import *
 from ext.parsers.errors import *
 from ext.utils import paginate, find_similar_str
 
 
-async def on_command_error(ctx: commands.Context, error: commands.CommandError):
+async def on_command_error(ctx: Context, error: commands.CommandError):
     # This prevents any commands with local handlers being handled here in on_command_error.
     if hasattr(ctx.command, 'on_error'):
         return

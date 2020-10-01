@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import asyncio
+import contextlib
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
-from mrbot import MrBot
+from ext.context import Context
 from .snake import Playfield, Snake, SnakeDiedError
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class SnakeCog(commands.Cog, name="Snake"):
@@ -15,7 +22,7 @@ class SnakeCog(commands.Cog, name="Snake"):
 
     @commands.command(name='snek', brief='Plej a simple gem of snek', hidden=True)
     @commands.is_owner()
-    async def snake_cmd(self, ctx):
+    async def snake_cmd(self, ctx: Context):
         if self.snake_running.is_set():
             return await ctx.send(f"Snake is already running.")
         snake = Snake(Playfield(5, 5))

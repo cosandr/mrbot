@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Union, Tuple, List, Optional, Dict, Set
+from typing import TYPE_CHECKING, Union, Tuple, List, Optional, Dict, Set
 
 import asyncpg
 import discord
 from discord.ext import commands
 from jellyfish import jaro_winkler_similarity
 
+from ext.context import Context
 from ext.utils import re_id, find_closest_match
-from mrbot import MrBot
 from .base import Common
 from .guild import Guild
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 instance_check = commands.Bot
 if os.getenv('IS_TEST', False):
@@ -196,7 +199,7 @@ class User(Common):
         q_args = [self.id, online, self.mobile, self.status_time or datetime.utcnow()]
         return q, q_args
 
-    async def to_discord(self, ctx: Union[MrBot, commands.Context], guild_id: int = None) -> Optional[Union[discord.Member, discord.User]]:
+    async def to_discord(self, ctx: Union[MrBot, Context], guild_id: int = None) -> Optional[Union[discord.Member, discord.User]]:
         bot, guild, _ = self._split_ctx(ctx, guild_id)
         # Check guild, return Member
         if guild:
@@ -215,7 +218,7 @@ class User(Common):
 
     # noinspection PyTypeChecker
     @staticmethod
-    def _split_ctx(ctx: Union[MrBot, commands.Context], guild_id: int = None) -> Tuple[MrBot, discord.Guild, int]:
+    def _split_ctx(ctx: Union[MrBot, Context], guild_id: int = None) -> Tuple[MrBot, discord.Guild, int]:
         """Split Context into bot and guild, try to get guild if Bot and guild_id are given."""
         if isinstance(ctx, instance_check):
             bot: MrBot = ctx
@@ -223,7 +226,7 @@ class User(Common):
                 guild = None
             else:
                 guild: discord.Guild = bot.get_guild(guild_id)
-        elif isinstance(ctx, commands.Context):
+        elif isinstance(ctx, Context):
             bot: MrBot = ctx.bot
             guild: discord.Guild = ctx.guild
             guild_id = ctx.guild.id
@@ -295,7 +298,7 @@ class User(Common):
         return None
 
     @classmethod
-    async def from_search(cls, ctx: Union[MrBot, commands.Context], search: Union[int, str],
+    async def from_search(cls, ctx: Union[MrBot, Context], search: Union[int, str],
                           guild_id: int = None, **kwargs) -> Optional[User]:
         """Look for user with a name/nickname similar to search, if search is ID look for that instead"""
         search_id: int = 0
@@ -342,7 +345,7 @@ class User(Common):
         return None
 
     @classmethod
-    async def from_id(cls, ctx: Union[MrBot, commands.Context], user_id: int,
+    async def from_id(cls, ctx: Union[MrBot, Context], user_id: int,
                       guild_id: int = None, **kwargs) -> Optional[User]:
         bot, _, guild_id = cls._split_ctx(ctx, guild_id=guild_id)
         # Check cache

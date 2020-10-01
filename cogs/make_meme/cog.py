@@ -1,15 +1,22 @@
+from __future__ import annotations
+
 import re
 import time
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 import ext.embed_helpers as emh
+from ext.context import Context
 from ext.parsers import parsers
 from ext.utils import find_similar_str, to_columns_vert
-from mrbot import MrBot
 from .templates import AllMemeTemplates
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
+
 
 """
 TODO
@@ -37,15 +44,14 @@ class MakeMeme(commands.Cog, name="Make Meme"):
             parsers.Arg('--entry', '-e', nargs='+', action='append', help='Name of template to use'),
         ],
     )
-    async def make(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        name = ' '.join(parsed.name)
+    async def make(self, ctx: Context):
+        name = ' '.join(ctx.parsed.name)
         try:
             template = self._templates[name]
         except KeyError:
             return await ctx.send(f'No template {name} found.')
         # Parse args
-        entries = [' '.join(e) for e in parsed.entry]
+        entries = [' '.join(e) for e in ctx.parsed.entry]
         # entries = self._re_entry.split(entries)
         # entries = [e for e in entries if e != '']
         if len(entries) != len(template):
@@ -64,7 +70,7 @@ class MakeMeme(commands.Cog, name="Make Meme"):
         await ctx.send(embed=embed, file=discord.File(buf, filename="meme.png"))
 
     @make.command(name='list', brief='List available templates')
-    async def make_list(self, ctx: commands.Context):
+    async def make_list(self, ctx: Context):
         all_memes = self._list_memes(name=None)
         embed = emh.embed_init(self.bot, 'Make Meme')
         embed.title = 'List'

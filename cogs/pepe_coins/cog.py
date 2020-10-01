@@ -1,18 +1,24 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import logging
 import random
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 from jellyfish import jaro_winkler_similarity
 
 import ext.embed_helpers as emh
+from ext.context import Context
 from ext.psql import create_table
 from ext.utils import fmt_timedelta, human_large_num
-from mrbot import MrBot
 from . import utils as pu
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class PepeCoins(commands.Cog, name="Pepe Coins"):
@@ -71,7 +77,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     @commands.command(
         brief="Buy more coin producing stuff",
         usage="1. Item you're buying\n2. Amount, default is 1.")
-    async def buy(self, ctx, what: str, amount: int = 1):
+    async def buy(self, ctx: Context, what: str, amount: int = 1):
         # Interpret input
         if what in 'midget':
             what = 'midget' if amount == 1 else 'midgets'
@@ -89,7 +95,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
 
     @commands.command(name='upgrade', brief='Upgrade your coin factories',
                       usage="1. Item to upgrade.\n")
-    async def upgrade(self, ctx, what: str, amount: int = 1):
+    async def upgrade(self, ctx: Context, what: str, amount: int = 1):
         # Interpret input
         if what in 'midget':
             what = 'midget' if amount == 1 else 'midgets'
@@ -106,12 +112,12 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
 
     # GAME INFO
     @commands.command(brief="Real time display of game stats")
-    async def prodinfo(self, ctx):
+    async def prodinfo(self, ctx: Context):
         msg = await ctx.send(f"Coin production display for {ctx.author.display_name}")
         self.bot.loop.create_task(self.game_task(ctx.author.id, msg))
 
     @commands.command(brief='Display game stats')
-    async def gamestats(self, ctx):
+    async def gamestats(self, ctx: Context):
         tmp = ''
         async with self.bot.pool.acquire() as con:
             q = f"SELECT * FROM {self.psql_table_name}"
@@ -125,7 +131,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
 
     # GAMBLING FUNCTIONS
     @commands.command(brief='First player chooses bet amount and roll limit')
-    async def deathroll(self, ctx, roll_lim: int):
+    async def deathroll(self, ctx: Context, roll_lim: int):
         # Roll up to roll_lim, then roll up to generated number under you get 1. Person who gets 1 wins.
         if roll_lim <= 0:
             return await ctx.send('Maximum roll must be larger than 0.')
@@ -220,7 +226,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
         brief="Bet on given number of coins",
         usage="1. Number of coins to bet.\nEveryone that has enough coins can then join by calling !bet themselves.",
     )
-    async def bet(self, ctx, bet_coins=None):
+    async def bet(self, ctx: Context, bet_coins=None):
         if bet_coins is None:
             bet_coins = self.gamble_calc(ctx.guild.id, 'bet', max)
         try:
@@ -273,7 +279,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
         return
 
     @commands.command(brief='Claim pepe coins every 10 hours')
-    async def claim(self, ctx):
+    async def claim(self, ctx: Context):
         embed = self.pepecoins_embed_init(ctx.author)
         claim_amount = self.claim_base
         has_claimed = False
@@ -323,7 +329,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
         brief='Transfer given amount to user',
         usage="1. Number of coins to transfer.\n2. User to transfer coins to.",
     )
-    async def transfer(self, ctx, amount: int, *, username: str):
+    async def transfer(self, ctx: Context, amount: int, *, username: str):
         embed = self.pepecoins_embed_init(ctx.author)
         q = f"SELECT (player).name,(player).id,(player).coins FROM {self.psql_table_name} WHERE (player).id=$1"
         send_p = await self.con.fetchrow(q, ctx.author.id)
@@ -375,7 +381,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
         return await ctx.send(embed=embed)
 
     @commands.command(brief="Display every players' balance")
-    async def bal(self, ctx):
+    async def bal(self, ctx: Context):
         tmp = ''
         async with self.bot.pool.acquire() as con:
             q = f"SELECT (player).name,(player).coins FROM {self.psql_table_name} ORDER BY (player).coins DESC"
@@ -458,12 +464,12 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     # DEBUG FUNCTIONS
     @commands.group(hidden=True)
     @commands.is_owner()
-    async def pd(self, ctx):
+    async def pd(self, ctx: Context):
         if ctx.invoked_subcommand is None:
-            return await self.bot.list_group_subcmds(ctx)
+            return await ctx.list_group_subcmds()
 
     @pd.command(hidden=True)
-    async def cost(self, ctx, amount: int = 10, ucount: int = 0, lcount: int = 0):
+    async def cost(self, ctx: Context, amount: int = 10, ucount: int = 0, lcount: int = 0):
         tmp = f"Costs for {amount} units/upgrades, starting from {ucount} units and {lcount} levels.\n"
         total_u = 0
         total_l = 0
@@ -481,7 +487,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     @prodinfo.before_invoke
     @deathroll.before_invoke
     @transfer.before_invoke
-    async def get_pool_con(self, ctx):
+    async def get_pool_con(self, _ctx: Context):
         if not self.con:
             self.con = await self.bot.pool.acquire()
 
@@ -489,7 +495,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     @prodinfo.after_invoke
     @deathroll.after_invoke
     @transfer.after_invoke
-    async def release_pool_con(self, ctx):
+    async def release_pool_con(self, _ctx: Context):
         if self.con:
             await self.bot.pool.release(self.con)
             self.con = None
@@ -551,7 +557,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
                 return await con.fetchrow(q, res['player']['id'])
         return None
 
-    async def buy_upgrade(self, ctx, what: str, unit: str, amount: int, upgrade=False):
+    async def buy_upgrade(self, ctx: Context, what: str, unit: str, amount: int, upgrade=False):
         async with self.bot.pool.acquire() as con:
             q = f"SELECT (stats).tcoins,(units).{unit} FROM {self.psql_table_name} WHERE (player).id=$1"
             res = await con.fetchrow(q, ctx.author.id)

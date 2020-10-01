@@ -3,12 +3,13 @@ from urllib.parse import urlparse
 
 from discord.ext import commands
 
+from .context import Context
 from .errors import ConnectionClosedError
 
 
 def open_connection_check(path: str = ''):
     """Returns False if connection at `path` is closed, checks configured bot config path without arguments"""
-    async def predicate(ctx):
+    async def predicate(ctx: Context):
         nonlocal path
         if not path:
             path = ctx.bot.config.brains

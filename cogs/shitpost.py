@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import os
 import random
 import time
 import uuid
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 import PIL
 import discord
@@ -13,9 +16,12 @@ from emoji import EMOJI_UNICODE
 import ext.embed_helpers as emh
 from ext import utils
 from ext.checks import open_connection_check
+from ext.context import Context
 from ext.internal import Message
 from ext.parsers import parsers
-from mrbot import MrBot
+
+if TYPE_CHECKING:
+    from mrbot import MrBot
 
 
 class Shitpost(commands.Cog, name='Shitposting'):
@@ -24,7 +30,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         self.all_emoji = list(EMOJI_UNICODE.values())
 
     @commands.command(name='father', brief="Bustin' games", aliases=['textbuster', 'madeby'])
-    async def post_gamebuster_image(self, ctx: commands.Context):
+    async def post_gamebuster_image(self, ctx: Context):
         # Transparent embed
         embed = utils.transparent_embed()
         embed.set_image(url='https://cdn.discordapp.com/attachments/425792779294212147/699648132253745262/dre.jpg')
@@ -36,7 +42,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         usage=("1. User who sent image or message ID.\nTakes most recent image if nobody is specified.\n"
                "This thing tries to generate ASCII art from input images."),
     )
-    async def ascii(self, ctx, msg_id=None, char_x=150):
+    async def ascii(self, ctx: Context, msg_id=None, char_x=150):
         embed = emh.embed_init(self.bot, "ASCII")
         embed.add_field(name="Characters", value=str(char_x), inline=True)
         embed.add_field(name="Resolution", value=str(char_x*12), inline=True)
@@ -65,7 +71,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         usage=("1. User who sent image or message ID.\nTakes most recent image if nobody is specified.\n"
                "Applies a bunch of garbage effects in an attempt to output a terrible picture."),
     )
-    async def ruin(self, ctx, msg_id=None):
+    async def ruin(self, ctx: Context, msg_id=None):
         embed = emh.embed_init(self.bot, "Ruin")
         if msg_id:
             embed.set_footer(text=f"Searching for image from {msg_id}.", icon_url=embed.footer.icon_url)
@@ -90,7 +96,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
                "Uses TensorFlow M A C H I N E  L E A R N I N G to rate an image."),
     )
     @open_connection_check()
-    async def shitpost(self, ctx, msg_id=None):
+    async def shitpost(self, ctx: Context, msg_id=None):
         embed = emh.embed_init(self.bot, "Rate shitpost")
         if msg_id:
             embed.set_footer(text=f"Searching for image from {msg_id}.", icon_url=embed.footer.icon_url)
@@ -132,17 +138,16 @@ class Shitpost(commands.Cog, name='Shitposting'):
             parsers.Arg('-m', '--message-id', type=int, help='Use content from message ID'),
         ],
     )
-    async def dying_text(self, ctx: commands.Context, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        if not parsed.content and not parsed.message_id:
+    async def dying_text(self, ctx: Context):
+        if not ctx.parsed.content and not ctx.parsed.message_id:
             return await ctx.send('Specify either content or message ID with `-m` option')
-        if parsed.message_id:
-            msg = await Message.from_id(ctx, msg_id=parsed.message_id)
+        if ctx.parsed.message_id:
+            msg = await Message.from_id(ctx, msg_id=ctx.parsed.message_id)
             if not msg:
-                return await ctx.send(f'No message with ID {parsed.message_id} found.')
+                return await ctx.send(f'No message with ID {ctx.parsed.message_id} found.')
             content = msg.content
         else:
-            content = ' '.join(parsed.content)
+            content = ' '.join(ctx.parsed.content)
         # Try to delete message
         with suppress(Exception):
             await ctx.message.delete()
@@ -154,7 +159,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         brief='Advanced technology, optionally specify length',
         usage="1. Number of words to use when generating shitpost.",
     )
-    async def shitgen(self, ctx, length=None):
+    async def shitgen(self, ctx: Context, length=None):
         if length is None:
             length = 30
         else:
@@ -212,9 +217,8 @@ class Shitpost(commands.Cog, name='Shitposting'):
         ],
     )
     @open_connection_check()
-    async def gif(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        params = vars(parsed)
+    async def gif(self, ctx: Context):
+        params = vars(ctx.parsed)
         # Replace some keys
         params['w'] = params.pop('width')
         params['h'] = params.pop('height')
@@ -259,9 +263,8 @@ class Shitpost(commands.Cog, name='Shitposting'):
         ],
     )
     @open_connection_check()
-    async def noise(self, ctx, *args):
-        parsed = ctx.command.parser.parse_args(args)
-        params = vars(parsed)
+    async def noise(self, ctx: Context):
+        params = vars(ctx.parsed)
         # Replace some keys
         params['w'] = params.pop('width')
         params['h'] = params.pop('height')
