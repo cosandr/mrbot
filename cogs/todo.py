@@ -89,7 +89,7 @@ class Todo(commands.Cog, name="Todo"):
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
         embed.set_footer(text="Time is in UTC, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         all_fields = []
         prio_count = {v: 0 for v in self.num_to_prio.values()}
         for res in result:
@@ -127,18 +127,18 @@ class Todo(commands.Cog, name="Todo"):
             return (r.message.id == msg.id and str(r.emoji) in control_em and
                     u.id == ctx.author.id)
 
-        def upd_bounds(start, end, step):
+        def upd_bounds(_start, _end, _step):
             """Updates paginator bounds, there is no loop functionality."""
-            start += step
-            end += step
-            if end >= len(all_fields):
-                diff = end - len(all_fields)
-                end -= diff
-                start -= diff
-            elif start < 0:
-                start = 0
-                end = abs(step)
-            return start, end
+            _start += _step
+            _end += _step
+            if _end >= len(all_fields):
+                diff = _end - len(all_fields)
+                _end -= diff
+                _start -= diff
+            elif _start < 0:
+                _start = 0
+                _end = abs(_step)
+            return _start, _end
 
         while True:
             try:
@@ -192,7 +192,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE user_id=$1 ORDER BY added DESC LIMIT 1"
             res = await con.fetchrow(q, ctx.author.id)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Add", icon_url=ctx.author.avatar_url)
+        embed.set_author(name="Todo Item Add", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -240,7 +240,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Edit", icon_url=ctx.author.avatar_url)
+        embed.set_author(name="Todo Item Edit", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     @todo.command(name='done', brief='Mark item as done from todo list by index')
@@ -254,7 +254,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, idx)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Done", icon_url=ctx.author.avatar_url)
+        embed.set_author(name="Todo Item Done", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     @todo.command(name='undo', brief='Mark item as undone from todo list by index')
@@ -268,7 +268,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, idx)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Undo", icon_url=ctx.author.avatar_url)
+        embed.set_author(name="Todo Item Undo", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     @todo.command(name='del', brief='Delete item from todo list by index')
@@ -282,7 +282,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"DELETE FROM {self.psql_table_name} WHERE id=$1"
             await con.execute(q, idx)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Deleted", icon_url=ctx.author.avatar_url)
+        embed.set_author(name="Todo Item Deleted", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     @todo.command(name='show', brief='Show single item by index')
@@ -293,7 +293,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, idx)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Show", icon_url=ctx.author.avatar_url)
+        embed.set_author(name="Todo Item Show", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     @todo.command(

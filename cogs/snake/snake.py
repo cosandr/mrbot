@@ -288,10 +288,12 @@ class Snake(Segment):
         self._logic_calc()
 
 
-if os.name == 'nt':
-    clear = lambda: os.system('cls')
-else:
-    clear = lambda: os.system('clear')
+def clear():
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        os.system('clear')
+
 
 pf = Playfield(10, 10)
 snake = Snake(pf)
@@ -323,7 +325,7 @@ async def board_update():
 
 
 async def read_keyboard(loop):
-    """Continously read keyboard input"""
+    """Continuously read keyboard input"""
     global snake, move_dir
     getch = _Getch()
     while True:

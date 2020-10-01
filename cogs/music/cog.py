@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 from typing import TYPE_CHECKING
@@ -218,10 +219,8 @@ class Music(commands.Cog, name="YouTube Music"):
         embed.title = f'Playing, {self.volume*100:.0f}% volume'
         embed.description = "\n".join(self.get_songs_around(limit=6))
         if self.controls_msg is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await self.controls_msg.delete()
-            except Exception:
-                pass
         self.controls_msg = await ctx.send(content=msg_content, embed=embed)
         control_em = ['⏮', '⏯', '⏭', '⏹']
         for em in control_em:

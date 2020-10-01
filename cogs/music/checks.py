@@ -22,8 +22,8 @@ def connect_voice_check():
             if ctx.author.voice:
                 ctx.cog.voice_con = await ctx.author.voice.channel.connect()
             else:
-                await ctx.send("You are not connected to a voice channel. Defaulting to IRL shitposting.")
                 channel = ctx.bot.get_channel(423141750106882048)
+                await ctx.send(f"You are not connected to a voice channel. Defaulting to {channel.name}.")
                 ctx.cog.voice_con = await channel.connect()
 
         return True

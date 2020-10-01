@@ -26,13 +26,10 @@ class SnakeCog(commands.Cog, name="Snake"):
         if self.snake_running.is_set():
             return await ctx.send(f"Snake is already running.")
         snake = Snake(Playfield(5, 5))
-        msg_content = "Listening" + snake.field.discord()
         if self.game_msg is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await self.game_msg.delete()
-            except Exception:
-                pass
-        self.game_msg = await ctx.send(content=msg_content)
+        self.game_msg = await ctx.send("Listening" + snake.field.discord())
         moves = {'⬆': snake.up,
                  '⬇': snake.down,
                  '⬅': snake.left,
