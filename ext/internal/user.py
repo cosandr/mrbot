@@ -17,12 +17,6 @@ from .guild import Guild
 if TYPE_CHECKING:
     from mrbot import MrBot
 
-instance_check = commands.Bot
-if os.getenv('IS_TEST', False):
-    from test.mock_bot import TestBot
-
-    instance_check = (commands.Bot, TestBot)
-
 
 class User(Common):
     psql_table_name = 'users'
@@ -220,7 +214,7 @@ class User(Common):
     @staticmethod
     def _split_ctx(ctx: Union[MrBot, Context], guild_id: int = None) -> Tuple[MrBot, discord.Guild, int]:
         """Split Context into bot and guild, try to get guild if Bot and guild_id are given."""
-        if isinstance(ctx, instance_check):
+        if isinstance(ctx, commands.Bot):
             bot: MrBot = ctx
             if not guild_id:
                 guild = None
@@ -430,6 +424,8 @@ class User(Common):
         if guild_id is not None and 'with_nick' in kwargs:
             results = await con.fetch(cls.make_psql_query(**kwargs), guild_id)
         else:
+            # We can't fetch nick, ignore argument if present
+            kwargs.pop('with_nick', None)
             results = await con.fetch(cls.make_psql_query(**kwargs))
         users = []
         for r in results:

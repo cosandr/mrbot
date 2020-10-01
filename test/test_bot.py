@@ -8,11 +8,13 @@ import discord
 from aiohttp import ClientSession
 
 from config import BotConfig
+from mrbot import MrBot
 
 
 class Connection:
     def __init__(self):
         self._messages = []
+        self._users = dict()
 
 
 class Response:
@@ -21,7 +23,8 @@ class Response:
         self.reason = 'Not found'
 
 
-class TestBot:
+class TestBot(MrBot):
+    # noinspection PyMissingConstructor
     def __init__(self, loop):
         self.loop: AbstractEventLoop = loop
         with open('config/.dsn_test', 'r') as f:
@@ -50,7 +53,6 @@ class TestBot:
         self.logger.addHandler(fh)
         self.logger.addHandler(ch)
         # --- Logger ---
-        self.users = []
 
     def get_user(self, user_id):
         return None
@@ -62,6 +64,7 @@ class TestBot:
         return None
 
     async def fetch_user(self, user_id):
+        # noinspection PyTypeChecker
         raise discord.errors.NotFound(Response(), 'User not found')
 
     async def async_init(self, con_live=False, con_pub=False):

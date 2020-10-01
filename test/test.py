@@ -11,7 +11,7 @@ from cogs.stars import Stars
 from cogs.todo import Todo
 from config import BotConfig
 from ext.internal import Message, User
-from .mock_bot import TestBot
+from .test_bot import TestBot
 from .test_plots import TestPlot
 
 

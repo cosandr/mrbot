@@ -3,7 +3,7 @@ from datetime import timedelta
 import matplotlib.pyplot as plt
 
 from ext.internal import Message
-from .mock_bot import TestBot
+from .test_bot import TestBot
 
 
 class TestPlot:

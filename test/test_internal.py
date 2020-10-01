@@ -10,7 +10,7 @@ import asyncpg
 
 from ext.internal import Message, User, Channel, Guild
 from ext.psql import create_table
-from test.mock_bot import TestBot
+from test.test_bot import TestBot
 
 
 class InternalTests(unittest.TestCase):
@@ -134,7 +134,7 @@ class InternalTests(unittest.TestCase):
             ok = []
             failed = []
             for u in users:
-                r = await con.fetchrow(User.make_psql_query(with_all_nicks=True, where='id=$1'), u.id)
+                r = await con.fetchrow(User.make_psql_query(with_all_nicks=True, where='id=$1', with_status=True, with_activity=True), u.id)
                 if not r:
                     print(f'ERROR: No user with ID {u.id} in PSQL')
                     failed.append(u)
