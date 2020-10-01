@@ -78,23 +78,19 @@ class Reactions(commands.Cog, name="Reaction"):
         q = f'SELECT category, react_list FROM {self.psql_table_name}'
         async with self.bot.pool.acquire() as con:
             results = await con.fetch(q)
-        ret_str = ""
-        for r in results:
-            if len(ret_str) > 1950:
-                await ctx.send(f"```{ret_str}```")
-                ret_str = ""
-            ret_str += f"\n# {r['category']}\n{utils.to_columns_vert(r['react_list'], num_cols=4, sort=True)}"
-        await ctx.send(f"```{ret_str}```")
+        if not results:
+            return await ctx.send('No reactions added.')
+        ret = [f"# {r['category']}\n{utils.to_columns_vert(r['react_list'], num_cols=4, sort=True)}" for r in results]
+        for p in utils.paginate('\n'.join(ret)):
+            await ctx.send(p)
 
     @reactions.command(name="add", brief="Add a link reaction")
     async def reactions_add(self, ctx: Context, reaction: str, category: str):
-        if category not in self.react_list:
-            await ctx.send("Invalid category.")
+        if not await self.check_category(ctx, category):
             return
         valid, err_str = self.validate_reaction(reaction)
         if not valid:
-            await ctx.send(err_str)
-            return
+            return await ctx.send(err_str)
         async with self.bot.pool.acquire() as con:
             q = f"UPDATE {self.psql_table_name} SET react_list=array_append(react_list, $2) WHERE category=$1"
             await con.execute(q, category, reaction)
@@ -103,8 +99,7 @@ class Reactions(commands.Cog, name="Reaction"):
 
     @reactions.command(name="move", brief="Change link reaction category")
     async def reactions_move(self, ctx: Context, reaction: str, new_category: str):
-        if new_category not in self.react_list:
-            await ctx.send("Invalid category.")
+        if not await self.check_category(ctx, new_category):
             return
         reaction = reaction.lower()
         valid = False
@@ -114,8 +109,7 @@ class Reactions(commands.Cog, name="Reaction"):
                 valid = True
                 old_cat = k
         if not valid:
-            await ctx.send(f"No reaction {reaction} found.")
-            return
+            return await ctx.send(f"No reaction {reaction} found.")
         async with self.bot.pool.acquire() as con:
             q_get = f"SELECT react_list FROM {self.psql_table_name} WHERE category=$1;"
             q_upd = f"UPDATE {self.psql_table_name} SET react_list=$2 WHERE category=$1;"
@@ -166,6 +160,16 @@ class Reactions(commands.Cog, name="Reaction"):
             await ctx.send(f"No reactions similar to {reaction} found.")
         else:
             await ctx.send(ret_str)
+
+    async def check_category(self, ctx: Context, category: str) -> bool:
+        if category not in self.react_list:
+            meant = utils.find_similar_str(category, self.react_list.keys())
+            if meant:
+                await ctx.send(f"Invalid category {category}, did you mean: {', '.join(meant)}?")
+                return False
+            await ctx.send(f"Invalid category {category}")
+            return False
+        return True
 
     def validate_reaction(self, in_str: str):
         err_str = ""
