@@ -564,8 +564,8 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             await channel.send(embed=embed)
             return await ctx.channel.delete_messages(msg_list)
 
-    @commands.group(name='reload')
-    async def reload(self, _ctx: Context):
+    @commands.group(name='reload', invoke_without_command=True)
+    async def reload(self, ctx: Context):
         self.logger.info('--- RELOAD START ---')
         self.logger.info(' -- Unloading cogs')
         self.bot.unload_all_extensions()
@@ -577,6 +577,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
         self.logger.info(' -- Loading cogs')
         self.bot.load_all_extensions(logger=self.logger)
         self.logger.info('--- RELOAD END ---')
+        await ctx.send('Reloaded all cogs')
 
     @reload.command(name='cog')
     async def reload_cog(self, ctx: Context, cog_name: str):
@@ -592,6 +593,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             await ctx.send(f'Failed to load {cog_name}: {str(e)}.')
             traceback.print_exc()
             return
+        await ctx.send(f'Reloaded cog {cog_name}')
 
     @commands.command(name='quit', brief="Kills the bot")
     async def quit(self, _ctx: Context):
