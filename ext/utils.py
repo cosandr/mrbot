@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
-from typing import Sequence, Optional, List, Tuple
+from typing import Sequence, Optional, List, Tuple, MappingView
 from typing import Union
 
 import asyncpg
@@ -177,7 +177,7 @@ def get_url(check: str, img_only: bool = False, one: bool = True) -> Union[str, 
 
 
 def find_closest_match(name: str, names: Sequence[str], recurse_call: bool = False) -> Optional[Tuple[str, float]]:
-    """Returns closest the closest match and its similarity
+    """Returns the closest match and its similarity
 
     Similarity is 1.0 if they are an exact match"""
     # Check exact matches
@@ -233,7 +233,7 @@ def find_closest_match(name: str, names: Sequence[str], recurse_call: bool = Fal
         return k, v
 
 
-def find_similar_str(name: str, names: Sequence[str], _recurse_call: bool = False) -> Optional[List[str]]:
+def find_similar_str(name: str, names: Union[Sequence[str], MappingView[str]], _recurse_call: bool = False) -> Optional[List[str]]:
     """Finds items similar to `name` in `names`"""
     meant: List[str] = []
     # Check exact matches
