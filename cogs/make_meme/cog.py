@@ -82,7 +82,3 @@ class MakeMeme(commands.Cog, name="Make Meme"):
         if name is None:
             return names
         return find_similar_str(name, names)
-
-
-def setup(bot: MrBot):
-    bot.add_cog(MakeMeme(bot))

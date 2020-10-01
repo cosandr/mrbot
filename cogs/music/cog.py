@@ -448,7 +448,3 @@ class Music(commands.Cog, name="YouTube Music"):
         # One person and bot, resume.
         elif (members_in_channel == 2) and (not self.voice_con.is_playing()):
             await self._resume()
-
-
-def setup(bot):
-    bot.add_cog(Music(bot))

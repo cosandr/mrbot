@@ -582,7 +582,3 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
             res = await con.fetchrow(q, ctx.author.id)
             return await ctx.send((f"{ctx.author.display_name} has {'upgrade' if upgrade else 'bought'} {amount} {what} for {human_large_num(cost)} coins."
                                    f"Coins: {human_large_num(res['tcoins'])}\nCPD: {human_large_num(pu.cps(res['units'])*86400)}"))
-
-
-def setup(bot):
-    bot.add_cog(PepeCoins(bot))
