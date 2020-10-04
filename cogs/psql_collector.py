@@ -127,6 +127,9 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         # Ignore bots
         if user.bot:
             return
+        # Ignore webhooks
+        if user.discriminator == '0000':
+            return
         # Check last update time
         now = datetime.utcnow()
         if last_typed := self._cache.typed.get(user.id):
@@ -181,6 +184,9 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         """Update user_status"""
+        # Ignore webhooks
+        if after.discriminator == '0000':
+            return
         if self.queue_task.done():
             return
         user = User.from_discord(after)
@@ -197,6 +203,9 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Update messages"""
+        # Ignore webhooks
+        if message.author.discriminator == '0000':
+            return
         # Don't do anything if worker is not running
         if self.queue_task.done():
             return
@@ -212,6 +221,9 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         """Update message_edits"""
+        # Ignore webhooks
+        if after.author.discriminator == '0000':
+            return
         if self.queue_task.done():
             return
         # Ignore self edits
@@ -225,6 +237,9 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         """Update messages"""
+        # Ignore webhooks
+        if payload.cached_message and payload.cached_message.author.discriminator == '0000':
+            return
         if self.queue_task.done():
             return
         msg = Message(id_=payload.message_id, deleted=True)
