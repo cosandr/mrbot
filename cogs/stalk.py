@@ -199,10 +199,14 @@ class Stalk(commands.Cog, name="Stalk"):
         else:
             title += ' of all time'
         if not ctx.parsed.with_test:
-            if 'WHERE' not in q:
-                q += 'WHERE ch_id != 422473204515209226 '
+            if not self.bot.config.channels.test:
+                title += ', test channel not configured'
             else:
-                q += 'AND ch_id != 422473204515209226 '
+                q_args.append(self.bot.config.channels.test)
+                if 'WHERE' not in q:
+                    q += f'WHERE ch_id != ${len(q_args)} '
+                else:
+                    q += f'AND ch_id != ${len(q_args)} '
         else:
             title += ', including test channel'
         if not ctx.parsed.all_bots:

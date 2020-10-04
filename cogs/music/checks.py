@@ -21,10 +21,13 @@ def connect_voice_check():
         if ctx.cog.voice_con is None:
             if ctx.author.voice:
                 ctx.cog.voice_con = await ctx.author.voice.channel.connect()
-            else:
-                channel = ctx.bot.get_channel(423141750106882048)
+            elif ctx.bot.config.channels.default_voice:
+                channel = ctx.bot.get_channel(ctx.bot.config.channels.default_voice)
                 await ctx.send(f"You are not connected to a voice channel. Defaulting to {channel.name}.")
                 ctx.cog.voice_con = await channel.connect()
+            else:
+                await ctx.send("You are not connected to a voice channel. No default channel configured.")
+                return False
 
         return True
     return commands.check(predicate)

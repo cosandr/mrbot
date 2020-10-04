@@ -246,6 +246,13 @@ class PathsConfig(BaseConfig):
             raise RuntimeError(f'Insufficient permissions for {p}')
 
 
+class ChannelsConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        self.exceptions: int = kwargs.pop('exceptions', None)
+        self.default_voice: int = kwargs.pop('default_voice', None)
+        self.test: int = kwargs.pop('test', None)
+
+
 class BotConfig(BaseConfig):
     """Global bot config, will not start without most of it"""
     psql_table_name = 'bot_config'
@@ -260,7 +267,7 @@ class BotConfig(BaseConfig):
     psql_all_tables = {(psql_table_name,): psql_table}
 
     def __init__(self, token, psql, api_keys=None, approved_guilds=None, brains='',
-                 guilds=None, hostname='', paths=None):
+                 guilds=None, hostname='', paths=None, channels=None):
         self.token: str = token
         self.psql: PostgresConfig = psql
         self.api_keys: dict = api_keys or dict()
@@ -269,6 +276,7 @@ class BotConfig(BaseConfig):
         self.guilds: Dict[int, GuildDef] = guilds or {}
         self.hostname: str = hostname
         self.paths: PathsConfig = paths
+        self.channels: ChannelsConfig = channels
 
     def safe_repr(self, _level=0):
         """Like pretty_repr but shorter and hides sensitive information (token, API keys)"""
@@ -301,6 +309,7 @@ class BotConfig(BaseConfig):
         """Read all from single dict"""
         kwargs = dict(psql=PostgresConfig(), api_keys={}, approved_guilds=[], guilds={})
         _paths = dict()
+        _channels = dict()
         for d in data.get('configs', []):
             if v := d.get('token'):
                 kwargs['token'] = v
@@ -317,12 +326,15 @@ class BotConfig(BaseConfig):
                 kwargs['hostname'] = v
             for name, val in d.get('paths', {}).items():
                 _paths[name] = val
+            for name, val in d.get('channels', {}).items():
+                _channels[name] = val
 
         for d in data.get('guilds', []):
             g = GuildDef.from_dict(d)
             kwargs['guilds'][g.id] = g
 
         kwargs['paths'] = PathsConfig(**_paths)
+        kwargs['channels'] = ChannelsConfig(**_channels)
 
         if not kwargs.get('token'):
             raise RuntimeError('Token not found in config')

@@ -210,7 +210,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         if self.queue_task.done():
             return
         # Ignore exceptions channel
-        if message.channel.id == 434276260164665345:
+        if message.channel.id == self.bot.config.channels.exceptions:
             return
 
         msg = Message.from_discord(message)

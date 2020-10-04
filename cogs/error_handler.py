@@ -126,12 +126,13 @@ async def on_command_error(ctx: Context, error: commands.CommandError):
     traceback_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     ctx.bot.logger.error(traceback_str)
     await ctx.send(f"{cmd_name} exception: {error}.")
-    try:
-        channel = ctx.bot.get_channel(434276260164665345)
-        for p in paginate(traceback_str):
-            await channel.send(p)
-    except Exception as e:
-        ctx.bot.logger.error(f'Cannot send to exceptions channel: {e}')
+    if ctx.bot.config.channels.exceptions:
+        try:
+            channel = ctx.bot.get_channel(ctx.bot.config.channels.exceptions)
+            for p in paginate(traceback_str):
+                await channel.send(p)
+        except Exception as e:
+            ctx.bot.logger.error(f'Cannot send to exceptions channel: {e}')
 
 
 def setup(bot):

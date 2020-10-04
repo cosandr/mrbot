@@ -76,6 +76,11 @@ Example `./launcher.py json-config -c config/config.json -g config/guild.json`
     "paths": {
         "data": "/data",
         "upload": "/var/www/discord"
+    },
+    "channels": {
+        "exceptions": 444276260164665321,
+        "default_voice": 453141750106882032,
+        "test": 453141750106882033
     }
 }
 
