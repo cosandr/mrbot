@@ -11,7 +11,6 @@ import time
 import traceback
 import unicodedata
 import uuid
-from datetime import datetime, timedelta
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -642,27 +641,6 @@ class Misc(commands.Cog, name="Miscellaneous"):
                 ret_str = ''
             ret_str += clip_list[i]
         return await ctx.send("```" + ret_str + "```")
-
-    async def notify_btn(self):
-        # TODO: Trash, use LISTEN, NOTIFY
-        prev_len = 0
-        while True:
-            try:
-                async with pg_connection(dsn=self.web_dsn) as con:
-                    q = "SELECT count(1) FROM uuids WHERE type='rl'"
-                    result = await con.fetchrow(q)
-                    rl_count = result['count']
-                if (rl_count > prev_len) and (prev_len > 0):
-                    q = "SELECT filename, uuid, created FROM uuids WHERE type='rl' ORDER BY created DESC LIMIT 1"
-                    result = await con.fetchrow(q)
-                    if result[2] > datetime.today() - timedelta(days=1):
-                        channel = self.bot.get_channel(425792779294212147)
-                        await channel.send(f"New BTN VOD {result[0]}:\n{self.bot.config.hostname}/rl?v={result[1]}")
-                prev_len = rl_count
-                await asyncio.sleep(1800)
-            except asyncio.CancelledError:
-                self.logger.info("[BTN] Task cancelled.")
-                break
 
     def dota2_hero_embed(self, ctx: Context, hero):
         attr_names = {'agi': 'Agility',
