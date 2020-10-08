@@ -288,9 +288,10 @@ class Reactions(commands.Cog, name="Reaction"):
                 # Only exact matches for short words
                 if len(m[0]) < 5 and m[1] != 1.0:
                     continue
-                if m[1] > 0.95:
-                    self.logger.debug("Added emoji %s similar to word %s [%.2f]", em.name, m[0], m[1])
-                    await message.add_reaction(em)
+                if m[1] < 0.95:
+                    continue
+                self.logger.debug("Added emoji %s similar to word %s [%.2f]", em.name, m[0], m[1])
+                await message.add_reaction(em)
 
         channel_name = get_channel_name(message)
         if channel_name != 'shitposts' or len(message.reactions) >= 20:

@@ -32,8 +32,8 @@ class Command(commands.Command):
             raise TypeError('Parser command should not have any arguments defined')
         if not isinstance(self.parser, ArgumentParser):
             raise TypeError(f'Command parser is of type {type(self.parser)} instead of ArgumentParser')
-        args = ctx.view.buffer[ctx.view.index:ctx.view.end].strip()
-        ctx.parsed = self.parser.parse_args(args.split())
+        args = ctx.view.buffer[ctx.view.index:ctx.view.end].split()
+        ctx.parsed = self.parser.parse_args(args)
 
 
 class Group(commands.Group, Command):
