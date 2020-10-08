@@ -279,14 +279,17 @@ class Reactions(commands.Cog, name="Reaction"):
         if self.re_crab.search(message.content):
             await message.add_reaction("\N{CRAB}")
 
-        # Add emoji if it is mentioned in text
-        words = message.content.split()
+        # Add emoji if it is mentioned in text, ignore short words
+        words = [w for w in message.content.split() if len(w) >= 3]
         for em in self.bot.emojis:
             if len(message.reactions) >= 20:
                 return
             if m := utils.find_closest_match(em.name, words):
-                if m[1] > 0.9:
-                    self.logger.debug("Added emoji %s similar to word %s", em.name, m[0])
+                # Only exact matches for short words
+                if len(m[0]) < 5 and m[1] != 1.0:
+                    continue
+                if m[1] > 0.95:
+                    self.logger.debug("Added emoji %s similar to word %s [%.2f]", em.name, m[0], m[1])
                     await message.add_reaction(em)
 
         channel_name = get_channel_name(message)
