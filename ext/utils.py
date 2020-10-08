@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
-from typing import Sequence, Optional, List, Tuple, MappingView
+from typing import Sequence, Optional, List, Tuple, MappingView, Set
 from typing import Union
 
 import asyncpg
@@ -235,32 +235,32 @@ def find_closest_match(name: str, names: Sequence[str], recurse_call: bool = Fal
 
 def find_similar_str(name: str, names: Union[Sequence[str], MappingView[str]], _recurse_call: bool = False) -> Optional[List[str]]:
     """Finds items similar to `name` in `names`"""
-    meant: List[str] = []
+    meant: Set[str] = set()
     # Check exact matches
     for el in names:
         if el == name:
-            meant.append(el)
+            meant.add(el)
             break
     name = name.lower()
     names_lower = [el.lower() for el in names]
     # Case insensitive exact matches
     for i in range(len(names)):
         if names_lower[i] == name:
-            meant.append(names[i])
+            meant.add(names[i])
     # Loose matches
     for i in range(len(names)):
         # Similar strings
         if jaro_winkler_similarity(name, names_lower[i]) > 0.8:
-            meant.append(names[i])
+            meant.add(names[i])
         # Input in output or vice versa
         if name in names_lower[i] or names_lower[i] in name:
-            meant.append(names[i])
+            meant.add(names[i])
     # If we have no matches still, try removing spaces
     if len(meant) == 0 and not _recurse_call:
         name = ''.join(name.strip())
         names = [''.join(el.strip()) for el in names_lower]
-        meant = find_similar_str(name, names, _recurse_call=True)
-    return meant
+        return find_similar_str(name, names, _recurse_call=True)
+    return list(meant)
 
 
 def human_timedelta(dt: datetime, max_vals: int = 3) -> str:
