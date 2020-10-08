@@ -45,6 +45,7 @@ class Reactions(commands.Cog, name="Reaction"):
         self.all_emoji = set(EMOJI_UNICODE.values())
         # Regex compile
         self.re_ruski = re.compile(r'[бвгджзклмнпрстфхцчшщаэыуояеёюи]', re.IGNORECASE)
+        self.re_crab = re.compile(r'is\s+gone', re.IGNORECASE)
         self.re_url = re.compile(r'https?://\S+')
         self.re_gyazo = re.compile(r'https://gyazo\.com/\w{32}')
         self.re_twitch = re.compile(r'https?://(clips\.|www\.)?twitch\S+')
@@ -200,7 +201,7 @@ class Reactions(commands.Cog, name="Reaction"):
         return valid, err_str
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
+    async def on_reaction_add(self, reaction: discord.Reaction, user:discord.User):
         if len(reaction.message.reactions) >= 20:
             return
         if user.id == self.bot.user.id:
@@ -241,7 +242,7 @@ class Reactions(commands.Cog, name="Reaction"):
         react_added = set()
         for m in self.re_em_unicode.finditer(message.content):
             if len(message.reactions) >= 20:
-                break
+                return
             em = m.group()
             if em in react_added:
                 continue
@@ -254,7 +255,7 @@ class Reactions(commands.Cog, name="Reaction"):
         # Add custom emoji
         for match in self.re_em.finditer(message.content):
             if len(message.reactions) >= 20:
-                break
+                return
             if not isinstance(match.group(), str):
                 continue
             found_id = int(self.re_em_id.search(match.group()).group())
@@ -266,17 +267,30 @@ class Reactions(commands.Cog, name="Reaction"):
                 self.logger.warning(f"Failed to add custom emoji {match.group()}: {e}")
                 continue
 
-        if len(message.reactions) < 20:
-            # Add russian flag if cyrillic letters in message
-            if self.re_ruski.search(message.content):
-                await message.add_reaction("\N{REGIONAL INDICATOR SYMBOL LETTER R}\N{REGIONAL INDICATOR SYMBOL LETTER U}")
+        if len(message.reactions) >= 20:
+            return
+        # Add russian flag if cyrillic letters in message
+        if self.re_ruski.search(message.content):
+            await message.add_reaction("\N{REGIONAL INDICATOR SYMBOL LETTER R}\N{REGIONAL INDICATOR SYMBOL LETTER U}")
 
-            # Add crab 'is gone' is in message
-            if 'is gone' in message.content.lower():
-                await message.add_reaction("\N{CRAB}")
+        if len(message.reactions) >= 20:
+            return
+        # Add crab 'is gone' is in message
+        if self.re_crab.search(message.content):
+            await message.add_reaction("\N{CRAB}")
+
+        # Add emoji if it is mentioned in text
+        words = message.content.split()
+        for em in self.bot.emojis:
+            if len(message.reactions) >= 20:
+                return
+            if m := utils.find_closest_match(em.name, words):
+                if m[1] > 0.9:
+                    self.logger.debug("Added emoji %s similar to word %s", em.name, m[0])
+                    await message.add_reaction(em)
 
         channel_name = get_channel_name(message)
-        if channel_name != 'shitposts':
+        if channel_name != 'shitposts' or len(message.reactions) >= 20:
             return
 
         url = None
