@@ -176,7 +176,7 @@ def get_url(check: str, img_only: bool = False, one: bool = True) -> Union[str, 
     return ret
 
 
-def find_closest_match(name: str, names: Sequence[str], recurse_call: bool = False) -> Optional[Tuple[str, float]]:
+def find_closest_match(name: str, names: Sequence[str], _recurse_call: bool = False) -> Optional[Tuple[str, float]]:
     """Returns the closest match and its similarity
 
     Similarity is 1.0 if they are an exact match"""
@@ -185,7 +185,7 @@ def find_closest_match(name: str, names: Sequence[str], recurse_call: bool = Fal
         if el == name:
             return name, 1.0
     # Convert to lower if not recursive call
-    if recurse_call:
+    if _recurse_call:
         names_lower = names
     else:
         name = name.lower()
@@ -220,10 +220,10 @@ def find_closest_match(name: str, names: Sequence[str], recurse_call: bool = Fal
         if sim > meant.get(names[i], 0):
             meant[names[i]] = sim
     # If we have no matches still, try removing spaces
-    if not meant and not recurse_call:
+    if not meant and not _recurse_call:
         name = ''.join(name.strip())
         names = [''.join(el.strip()) for el in names_lower]
-        meant = find_closest_match(name, names, recurse_call=True)
+        meant = find_closest_match(name, names, _recurse_call=True)
     if not meant or meant == ('', 0):
         return '', 0
     for k, v in reversed(sorted(meant.items(), key=lambda item: item[1])):
