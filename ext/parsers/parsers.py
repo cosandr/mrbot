@@ -33,8 +33,7 @@ class Command(commands.Command):
         if not isinstance(self.parser, ArgumentParser):
             raise TypeError(f'Command parser is of type {type(self.parser)} instead of ArgumentParser')
         args = ctx.view.buffer[ctx.view.index:ctx.view.end].strip()
-        if args:
-            ctx.parsed = self.parser.parse_args(args.split())
+        ctx.parsed = self.parser.parse_args(args.split())
 
 
 class Group(commands.Group, Command):
