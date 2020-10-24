@@ -199,7 +199,7 @@ class Todo(commands.Cog, name="Todo"):
         name='edit',
         brief='Edit item in todo list',
         parser_args=[
-            parsers.Arg('index', type=int, help='Main item content'),
+            parsers.Arg('index', type=int, help='Item number'),
             parsers.Arg('--title', '-t', default=None, nargs='*', help='Main content'),
             parsers.Arg('--priority', '-p', default=None, help='Item priority'),
             parsers.Arg('--extra', '-e', default=None, nargs='*', help='Extra information'),
@@ -243,55 +243,79 @@ class Todo(commands.Cog, name="Todo"):
         embed.set_author(name="Todo Item Edit", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
-    @todo.command(name='done', brief='Mark item as done from todo list by index')
-    async def todo_done(self, ctx: Context, idx: int):
-        if not await self.check_todo_item(ctx, idx):
+    @todo.command(
+        name='done',
+        brief='Mark item as done from todo list by index',
+        parser_args=[
+            parsers.Arg('index', type=int, help='Item number'),
+        ],
+    )
+    async def todo_done(self, ctx: Context):
+        if not await self.check_todo_item(ctx, ctx.parsed.index):
             return
         async with self.bot.pool.acquire() as con:
             q = f"UPDATE {self.psql_table_name} SET done=NOW() WHERE id=$1"
-            await con.execute(q, idx)
+            await con.execute(q, ctx.parsed.index)
             # Fetch what we just marked done for display
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
-            res = await con.fetchrow(q, idx)
+            res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
         embed.set_author(name="Todo Item Done", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
-    @todo.command(name='undo', brief='Mark item as undone from todo list by index')
-    async def todo_undo(self, ctx: Context, idx: int):
-        if not await self.check_todo_item(ctx, idx):
+    @todo.command(
+        name='undo',
+        brief='Mark item as undone from todo list by index',
+        parser_args=[
+            parsers.Arg('index', type=int, help='Item number'),
+        ],
+    )
+    async def todo_undo(self, ctx: Context):
+        if not await self.check_todo_item(ctx, ctx.parsed.index):
             return
         async with self.bot.pool.acquire() as con:
             q = f"UPDATE {self.psql_table_name} SET done=NULL WHERE id=$1"
-            await con.execute(q, idx)
+            await con.execute(q, ctx.parsed.index)
             # Fetch what we just marked undone for display
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
-            res = await con.fetchrow(q, idx)
+            res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
         embed.set_author(name="Todo Item Undo", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
-    @todo.command(name='del', brief='Delete item from todo list by index')
-    async def todo_del(self, ctx: Context, idx: int):
-        if not await self.check_todo_item(ctx, idx):
+    @todo.command(
+        name='del',
+        brief='Delete item from todo list by index',
+        parser_args=[
+            parsers.Arg('index', type=int, help='Item number'),
+        ],
+    )
+    async def todo_del(self, ctx: Context):
+        if not await self.check_todo_item(ctx, ctx.parsed.index):
             return
         async with self.bot.pool.acquire() as con:
             # Fetch what we are deleting for display
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
-            res = await con.fetchrow(q, idx)
+            res = await con.fetchrow(q, ctx.parsed.index)
             q = f"DELETE FROM {self.psql_table_name} WHERE id=$1"
-            await con.execute(q, idx)
+            await con.execute(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
         embed.set_author(name="Todo Item Deleted", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
-    @todo.command(name='show', brief='Show single item by index')
-    async def todo_show(self, ctx: Context, idx: int):
-        if not await self.check_todo_item(ctx, idx):
+    @todo.command(
+        name='show',
+        brief='Show single item by index',
+        parser_args=[
+            parsers.Arg('index', type=int, help='Item number'),
+        ],
+    )
+    async def todo_show(self, ctx: Context):
+        if not await self.check_todo_item(ctx, ctx.parsed.index):
             return
         async with self.bot.pool.acquire() as con:
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
-            res = await con.fetchrow(q, idx)
+            res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
         embed.set_author(name="Todo Item Show", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
