@@ -15,7 +15,6 @@ from ext import utils
 from ext.context import Context
 from ext.internal import Guild
 from ext.psql import create_table
-from ext.utils import get_channel_name
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -293,8 +292,7 @@ class Reactions(commands.Cog, name="Reaction"):
                 self.logger.debug("Added emoji %s similar to word %s [%.2f]", em.name, m[0], m[1])
                 await message.add_reaction(em)
 
-        channel_name = get_channel_name(message)
-        if channel_name != 'shitposts' or len(message.reactions) >= 20:
+        if len(message.reactions) >= 20:
             return
 
         url = None
@@ -309,6 +307,11 @@ class Reactions(commands.Cog, name="Reaction"):
             url = message.embeds[0].image.url
 
         if not isinstance(url, str):
+            return
+
+        # 20% chance to add random emoji if there are no reactions already
+        if len(message.reactions) == 0 and random.randint(0, 10) <= 2:
+            await message.add_reaction(random.choice(self.bot.emojis))
             return
 
         pos_override = None
