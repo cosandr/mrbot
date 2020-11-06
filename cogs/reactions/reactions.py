@@ -359,10 +359,16 @@ class Reactions(commands.Cog, name="Reaction"):
             url = message.embeds[0].image.url
 
         if not isinstance(url, str):
+            # 50% chance to add respond to question if there are no reactions already
+            if len(message.reactions) == 0 and message.content.endswith('?') and random.randint(0, 10) < 5:
+                if random.randint(0, 10) < 5:
+                    await self.bot.add_reaction_str(message, "no")
+                else:
+                    await self.bot.add_reaction_str(message, "yes")
             return
 
         # 20% chance to add random emoji if there are no reactions already
-        if len(message.reactions) == 0 and random.randint(0, 10) <= 2:
+        if len(message.reactions) == 0 and random.randint(0, 10) < 2:
             await message.add_reaction(random.choice(self.bot.emojis))
             return
 
