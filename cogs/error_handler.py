@@ -115,6 +115,9 @@ async def on_command_error(ctx: Context, error: commands.CommandError):
     elif isinstance(error, ArgParseError):
         return await ctx.send(str(error))
 
+    elif isinstance(error, ArgParseMessageError):
+        return await ctx.send(error.message)
+
     elif isinstance(error, NoVoiceConnectionError):
         cmd_name = f'{ctx.prefix}{ctx.command.qualified_name}'
         return await ctx.send(f"`{cmd_name}` requires the bot to be connected to a voice channel.")
