@@ -188,7 +188,7 @@ class Reactions(commands.Cog, name="Reaction"):
         if ctx.parsed.list:
             if not self.config.on_message_ignore_channels:
                 return await ctx.send('No channels configured')
-            tmp = 'Ignored channels:```'
+            tmp = 'Ignored channels:'
             for ch_id in self.config.on_message_ignore_channels:
                 if ch := self.bot.get_channel(ch_id):
                     tmp += f'\n- {ch.mention}'
@@ -196,7 +196,7 @@ class Reactions(commands.Cog, name="Reaction"):
                         tmp += f' in guild {ch.guild.name}'
                 else:
                     tmp += f'\n- ID {ch_id}'
-            return await ctx.send(f'{tmp}```')
+            return await ctx.send(tmp)
         ch_id = ctx.parsed.ignore_channel
         if ch_id:
             if not re_id.match(str(ch_id)):
