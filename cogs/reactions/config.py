@@ -37,6 +37,8 @@ class ReactionsConfig:
 
     @classmethod
     def from_json(cls, data: str):
+        if not data:
+            return cls()
         return cls.from_dict(json.loads(data))
 
     def to_dict(self) -> dict:
