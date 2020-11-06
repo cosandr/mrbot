@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
-from emoji import EMOJI_UNICODE
 
 import config as cfg
 from ext import utils, parsers
@@ -42,7 +41,6 @@ class Reactions(commands.Cog, name="Reaction"):
         self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
-        self.all_emoji = set(EMOJI_UNICODE.values())
         # Regex compile
         self.re_ruski = re.compile(r'[бвгджзклмнпрстфхцчшщаэыуояеёюи]', re.IGNORECASE)
         self.re_crab = re.compile(r'is\s+gone', re.IGNORECASE)
@@ -249,7 +247,7 @@ class Reactions(commands.Cog, name="Reaction"):
         return valid, err_str
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction: discord.Reaction, user:discord.User):
+    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
         if len(reaction.message.reactions) >= 20:
             return
         if user.id == self.bot.user.id:
