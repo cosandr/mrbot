@@ -5,7 +5,7 @@ Host requirements (Debian):
 
 A PostgreSQL server is required.
 
-Running in Docker is the easiest solution, [Dockerfile](https://github.com/cosandr/containers/blob/master/containers/mrbot/bot.Dockerfile)
+Running in Docker is the easiest solution, [Dockerfile](https://github.com/cosandr/containers/blob/master/mrbot/bot.Dockerfile)
 
 Most of the CPU heavy tasks are run using its [brains API](https://github.com/cosandr/mrbot-brains).
 The bot runs without it, however none of the machine learning commands will work.
