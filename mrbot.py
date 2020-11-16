@@ -25,6 +25,7 @@ from ext.utils import cleanup_http_params, human_seconds
 
 class MrBot(commands.Bot):
     def __init__(self, *args, **kwargs):
+        self.busy_file: str = kwargs.pop('busy_file', '')
         self.config: cfg.BotConfig = kwargs.pop('config')
         super().__init__(*args, **kwargs)
         # --- Bot variable init ---
@@ -74,6 +75,11 @@ class MrBot(commands.Bot):
             check_prefix = self.command_prefix
         group = '|'.join(re.escape(p * 2) for p in check_prefix)
         self._re_prefix_check = re.compile(f'^({group}).*')
+        self._running_commands = 0
+        self._busy_wake = asyncio.Event()
+        self._busy_task = None
+        if self.busy_file:
+            self._busy_task = self.loop.create_task(self.busy_file_worker())
         self.load_all_extensions()
 
     def run(self, *args, **kwargs):
@@ -108,6 +114,8 @@ class MrBot(commands.Bot):
             return
         self._close_ran = True
         self.logger.info(f"{'-'*10} Cleanup start {'-'*10}")
+        if self._busy_task:
+            self._busy_task.cancel()
         self.logger.info('--- Unloading cogs')
         self.unload_all_extensions()
         for task in self.cleanup_tasks:
@@ -124,17 +132,44 @@ class MrBot(commands.Bot):
         self.logger.info(f"{'-'*10} Cleanup done {'-'*11}\n")
         await super().close()
 
+    async def busy_file_worker(self):
+        def _delete_file():
+            if os.path.exists(self.busy_file):
+                os.unlink(self.busy_file)
+                self.logger.debug("Busy file %s removed", self.busy_file)
+        try:
+            while True:
+                await self._busy_wake.wait()
+                # Wait half a second before creating file
+                await asyncio.sleep(0.5)
+                if self._running_commands > 0 and not os.path.exists(self.busy_file):
+                    open(self.busy_file, 'a').close()
+                    self.logger.debug("Busy file %s created", self.busy_file)
+                elif self._running_commands <= 0:
+                    _delete_file()
+                    self._running_commands = 0
+                self._busy_wake.clear()
+        except asyncio.CancelledError:
+            return
+        finally:
+            _delete_file()
+
     async def on_message(self, message: discord.Message) -> None:
         # Don't respond to bots
         if message.author.bot:
             return
 
         # Only process commands starting with a single prefix
-        # Maybe use prepared regex pattern?
         if self._re_prefix_check.match(message.content):
             return
         ctx = await self.get_context(message, cls=Context)
-        await self.invoke(ctx)
+        try:
+            self._running_commands += 1
+            self._busy_wake.set()
+            await self.invoke(ctx)
+        finally:
+            self._running_commands -= 1
+            self._busy_wake.set()
 
     @staticmethod
     async def add_reaction_str(msg: discord.Message, in_str: str) -> None:

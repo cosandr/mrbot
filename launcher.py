@@ -37,6 +37,7 @@ def psql_config(args: argparse.Namespace):
 parser = argparse.ArgumentParser(description='MrBot launcher')
 
 grp_bot = parser.add_argument_group(title='Bot options')
+grp_bot.add_argument('--busy-file', type=str, default=os.getenv("BUSY_FILE"), help='Create file whenever a command is running')
 grp_bot.add_argument('--command-prefix', type=str, default='!', help='Change command prefix')
 grp_bot.add_argument('--owner-id', type=int, default=227847073607712768, help='Change owner ID')
 grp_bot.add_argument('--ext', action='append', help='Override extensions that are loaded')
@@ -66,6 +67,7 @@ if __name__ == '__main__':
     if not CONFIG:
         raise RuntimeError('No config loaded')
     bot = MrBot(
+        busy_file=_args.busy_file,
         config=CONFIG,
         command_prefix=_args.command_prefix,
         owner_id=_args.owner_id,
