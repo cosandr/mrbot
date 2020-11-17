@@ -4,8 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
-from typing import Sequence, Optional, List, Tuple, MappingView, Set
-from typing import Union
+from typing import Sequence, Optional, List, Tuple, MappingView, Set, Union
 
 import asyncpg
 import discord

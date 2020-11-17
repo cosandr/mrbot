@@ -16,7 +16,7 @@ from discord.ext import commands
 from ext.context import Context
 from ext.internal import Channel, Guild, Message, User
 from ext.psql import create_table, debug_query, ensure_foreign_key, try_foreign_key_add
-from ext.utils import QueueItem
+from ext.utils import QueueItem, human_seconds
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -52,6 +52,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
             name     VARCHAR(200) NOT NULL,
             cog_name VARCHAR(100),
             time     TIMESTAMP NOT NULL,
+            ran_for  REAL,
             bot_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
             user_id  BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
             ch_id    BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
@@ -166,19 +167,19 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         await self.check_and_update(user=user, channel=channel)
 
     @commands.Cog.listener()
-    async def on_command(self, ctx: Context):
+    async def on_command_log_done(self, ctx: Context, start: datetime, ran_for: float):
         """Update command_log"""
-        cog_name = ctx.cog.__cog_name__ if ctx.cog else None
+        cog_name = ctx.cog.qualified_name if ctx.cog else None
         guild_id = ctx.guild.id if ctx.guild else None
         q = (f'INSERT INTO {self.psql_table_name_command_log} '
-             '(name, cog_name, time, bot_id, user_id, ch_id, guild_id) '
-             'VALUES ($1, $2, $3, $4, $5, $6, $7)')
-        q_args = [ctx.command.qualified_name, cog_name, datetime.utcnow(), self.bot.user.id, ctx.author.id,
-                  ctx.channel.id, guild_id]
+             '(name, cog_name, time, ran_for, bot_id, user_id, ch_id, guild_id) '
+             'VALUES ($1, $2, $3, $4, $5, $6, $7, $8)')
+        q_args = [ctx.command.qualified_name, cog_name, start, ran_for,
+                  self.bot.user.id, ctx.author.id, ctx.channel.id, guild_id]
         int_user = User.from_discord(ctx.author)
         int_ch = Channel.from_discord(ctx.channel)
         int_guild = Guild.from_discord(ctx.guild)
-        self.logger.debug("Added command %s used by %s to command log", q_args[0], int_user.name)
+        self.logger.debug("%s used '%s', finished in %s", int_user.name, q_args[0], human_seconds(ran_for, num_units=1, precision=2))
         await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_ch, guild=int_guild)))
 
     @commands.Cog.listener()

@@ -7,6 +7,7 @@ import re
 import signal
 import traceback
 from base64 import b64decode
+from datetime import datetime
 from typing import List, Optional
 
 import asyncpg
@@ -163,13 +164,19 @@ class MrBot(commands.Bot):
         if self._re_prefix_check.match(message.content):
             return
         ctx = await self.get_context(message, cls=Context)
+        start = None
         try:
             self._running_commands += 1
             self._busy_wake.set()
+            if ctx.command:
+                start = datetime.utcnow()
             await self.invoke(ctx)
         finally:
             self._running_commands -= 1
             self._busy_wake.set()
+            if start is not None:
+                ran_for = (datetime.utcnow() - start).total_seconds()
+                self.dispatch('command_log_done', ctx, start, ran_for)
 
     @staticmethod
     async def add_reaction_str(msg: discord.Message, in_str: str) -> None:
