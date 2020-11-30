@@ -357,8 +357,8 @@ class Reactions(commands.Cog, name="Reaction"):
             url = message.embeds[0].image.url
 
         if not isinstance(url, str):
-            # 50% chance to add respond to question if there are no reactions already
-            if len(message.reactions) == 0 and message.content.endswith('?') and random.randint(0, 10) < 5:
+            # 30% chance to add respond to question if there are no reactions already
+            if len(message.reactions) == 0 and message.content.endswith('?') and random.randint(0, 10) < 3:
                 if random.randint(0, 10) < 5:
                     await self.bot.add_reaction_str(message, "no")
                 else:
