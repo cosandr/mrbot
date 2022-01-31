@@ -12,4 +12,5 @@ py-spy
 scipy
 matplotlib
 dateparser
+pytimeparse
 git+https://github.com/carpedm20/emoji@master

@@ -274,8 +274,10 @@ def human_timedelta(dt: datetime, max_vals: int = 3) -> str:
     }
     ret_str = ""
     seconds = (datetime.utcnow()-dt).total_seconds()
+    past = seconds > 0
+    seconds = abs(seconds)
     if seconds < 1:
-        return "just now"
+        return "just now" if past else "about now"
     tmp = 0
     for name, val in times.items():
         if tmp >= max_vals:
@@ -289,7 +291,7 @@ def human_timedelta(dt: datetime, max_vals: int = 3) -> str:
             ret_str += f"{int(unit)} {name}s, "
         seconds = rem
         tmp += 1
-    return f"{ret_str[:-2]} ago"
+    return f"{ret_str[:-2]} ago" if past else f"in {ret_str[:-2]}"
 
 
 def fmt_timedelta(td: timedelta, with_seconds: bool = False) -> str:
@@ -313,8 +315,10 @@ def human_timedelta_short(dt: datetime, max_vals: int = 3) -> str:
     }
     ret_str = ""
     seconds = (datetime.utcnow()-dt).total_seconds()
+    past = seconds > 0
+    seconds = abs(seconds)
     if seconds < 1:
-        return "just now"
+        return "just now" if past else "about now"
     tmp = 0
     for name, val in times.items():
         if tmp >= max_vals:
@@ -325,7 +329,7 @@ def human_timedelta_short(dt: datetime, max_vals: int = 3) -> str:
         ret_str += f"{int(unit)}{name}, "
         seconds = rem
         tmp += 1
-    return f"{ret_str[:-2]} ago"
+    return f"{ret_str[:-2]} ago" if past else f"in {ret_str[:-2]}"
 
 
 def human_large_num(num, with_zeroes: bool = False, e_notation: bool = False) -> str:

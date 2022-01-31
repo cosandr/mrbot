@@ -122,6 +122,16 @@ class User(Common):
             return self.name
         return ''
 
+    def mention(self, guild_id: Optional[int] = None) -> str:
+        """Returns a string that allows you to mention the member.
+
+        :param guild_id: Optional guild ID for more personalized mentions
+        :return: String that can be used for mentioning the user
+        """
+        if guild_id and self.get_nick(guild_id):
+            return f'<@!{self.id}>'
+        return f'<@{self.id}>'
+
     def diff_tol(self, other: User, guild_id=None, all_nicks=False) -> Set[str]:
         """Returns set of different attributes
 
