@@ -4,12 +4,12 @@ import asyncio
 import itertools
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional
 
 import asyncpg
+import dateparser
 import discord
 import pytimeparse
-import dateparser
 from discord.ext import commands
 
 import config as cfg
@@ -17,7 +17,7 @@ from ext import utils
 from ext.context import Context
 from ext.internal import User, Channel
 from ext.parsers import parsers
-from ext.psql import create_table
+from ext.psql import create_table, ensure_foreign_key
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -27,17 +27,19 @@ class Reminders(commands.Cog, name="Reminders"):
     psql_table_name = 'reminders'
     psql_table = f"""
         CREATE TABLE IF NOT EXISTS {psql_table_name} (
-            id         SERIAL UNIQUE,
-            title      TEXT NOT NULL,
-            recipients BIGINT [],
-            notify_ts  TIMESTAMP NOT NULL,
-            repeat     BIGINT,
-            updated    TIMESTAMP,
-            added      TIMESTAMP DEFAULT (NOW() at time zone 'utc'),
-            fired      BOOLEAN DEFAULT false,
-            failed     BOOLEAN DEFAULT false,
-            owner_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
-            channel_id BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE
+            id          SERIAL UNIQUE,
+            title       TEXT NOT NULL,
+            description TEXT,
+            recipients  BIGINT [],
+            notify_ts   TIMESTAMP NOT NULL,
+            repeat      BIGINT,
+            repeat_n    INTEGER,
+            updated     TIMESTAMP,
+            added       TIMESTAMP DEFAULT (NOW() at time zone 'utc'),
+            done        BOOLEAN DEFAULT false,
+            failed      BOOLEAN DEFAULT false,
+            owner_id    BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
+            channel_id  BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE
         );
     """
     psql_all_tables = User.psql_all_tables.copy()
@@ -71,30 +73,44 @@ class Reminders(commands.Cog, name="Reminders"):
         brief='Add item to reminders',
         parser_args=[
             parsers.Arg('title', nargs='+', help='Main item content'),
+            parsers.Arg('--description', '-d', default=None, nargs='*', help='Optional description'),
             parsers.Arg('--timestamp', '-t', required=True, nargs='+', help='Time for notification'),
             parsers.Arg('--channel', '-c', default=None, help='Optional channel'),
             parsers.Arg('--repeat', '-r', default=None, nargs='*', help='Optional repeat interval'),
+            parsers.Arg('--repeat-times', '-n', default=None, type=int, help='Number of times to repeat'),
             parsers.Arg('--recipients', '-u', default=None, nargs='*', help='Users which will be notified (you will always be notified)'),
         ],
     )
     async def reminder_add(self, ctx: Context):
         title = ' '.join(ctx.parsed.title)
+        description = ' '.join(ctx.parsed.description) if ctx.parsed.description else None
         timestamp = ' '.join(ctx.parsed.timestamp)
         repeat = ' '.join(ctx.parsed.repeat) if ctx.parsed.repeat else None
+        repeat_n = ctx.parsed.repeat_times
         recipients = ctx.parsed.recipients or []
-        channel = ctx.parsed.channel or ctx.channel.id
+        channel = ctx.parsed.channel or str(ctx.channel.id)
         # Try to parse
-        parsed_ts = dateparser.parse(timestamp, settings={'TIMEZONE': 'UTC', 'RETURN_AS_TIMEZONE_AWARE': False})
+        # This will interpret absolute times as UTC
+        # parsed_ts = dateparser.parse(timestamp, settings={'TIMEZONE': 'UTC', 'RETURN_AS_TIMEZONE_AWARE': False})
+        parsed_ts = dateparser.parse(timestamp, settings={'PREFER_DATES_FROM': 'future', 'DATE_ORDER': 'DMY'})
         parsed_repeat = None
         if not parsed_ts:
             return await ctx.send(f'Could not parse timestamp "{timestamp}"')
         if datetime.utcnow() >= parsed_ts:
-            return await ctx.send('Reminder timestamp cannot be in the past')
+            return await ctx.send(f'Reminder time cannot be in the past: {parsed_ts.strftime(cfg.TIME_FORMAT)}')
+        # Interpret commands as local time, but store UTC
+        parsed_ts = parsed_ts.astimezone(tz=timezone.utc).replace(tzinfo=None)
         if repeat:
             parsed_repeat = pytimeparse.parse(repeat)
             if not parsed_repeat:
                 return await ctx.send(f'Could not parse repeat interval "{repeat}"')
-
+            if repeat_n and repeat_n <= 0:
+                return await ctx.send('Number of repeats must be a positive number')
+        ch_conv = commands.TextChannelConverter()
+        try:
+            channel = await ch_conv.convert(ctx, channel)
+        except commands.ChannelNotFound:
+            return await ctx.send(f"No channel {channel} found.")
         users = []
         for r in recipients:
             u = await User.from_search(ctx, r)
@@ -106,9 +122,17 @@ class Reminders(commands.Cog, name="Reminders"):
             users.append(u.id)
 
         async with self.bot.pool.acquire() as con:
-            q = (f"INSERT INTO {self.psql_table_name} (title, recipients, notify_ts, repeat, owner_id, channel_id) "
-                 "VALUES ($1, $2, $3, $4, $5, $6)")
-            await con.execute(q, title, users, parsed_ts, parsed_repeat, ctx.author.id, channel)
+            q = (f"INSERT INTO {self.psql_table_name} (title, description, recipients, notify_ts, repeat, repeat_n, owner_id, channel_id) "
+                 "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
+            for _ in range(2):
+                try:
+                    await con.execute(q, title, description, users, parsed_ts, parsed_repeat, repeat_n, ctx.author.id, channel.id)
+                    break
+                except asyncpg.exceptions.ForeignKeyViolationError:
+                    user_ok = await ensure_foreign_key(con=con, obj=User.from_discord(ctx.author), logger=self.logger)
+                    ch_ok = await ensure_foreign_key(con=con, obj=Channel.from_discord(channel), logger=self.logger)
+                    if not user_ok or not ch_ok:
+                        return await ctx.send("Database error, could not add user or channel.")
             await self.refresh_worker()
             # Fetch what we just added for display
             q = f"SELECT * FROM {self.psql_table_name} WHERE owner_id=$1 AND notify_ts=$2 ORDER BY added DESC LIMIT 1"
@@ -121,25 +145,33 @@ class Reminders(commands.Cog, name="Reminders"):
         name='list',
         brief="List all reminders you're involved with",
         parser_args=[
-            parsers.Arg('--absolute', '-a', default=False, help='Show absolute times', action='store_true'),
+            parsers.Arg('--all', '-a', default=False, help='Include reminders marked as done', action='store_true'),
+            parsers.Arg('--absolute', default=False, help='Show absolute times', action='store_true'),
         ],
     )
     async def reminder_list(self, ctx):
-        q = f"SELECT * FROM {self.psql_table_name} WHERE owner_id=$1 OR $1=ANY(recipients)"
+        q = f"SELECT * FROM {self.psql_table_name} WHERE (owner_id=$1 OR $1=ANY(recipients))"
+        if not ctx.parsed.all:
+            q += " AND done=false"
+        q += " ORDER BY notify_ts DESC"
         async with self.bot.pool.acquire() as con:
             result = await con.fetch(q, ctx.author.id)
         if len(result) == 0:
-            await ctx.send(f"{ctx.author.display_name} is not involved with any reminders.")
+            await ctx.send(f"{ctx.author.display_name} has no pending or failed reminders.")
             return
-        tmp_val = []
+        tmp_val = ""
         for res in result:
+            if res['failed']:
+                tmp_val += "❌ "
+            elif res['done']:
+                tmp_val += "✅ "
             if ctx.parsed.absolute:
                 ts = self.format_dt_tz(res["notify_ts"])
-                tmp_val.append(f'{res["id"]}: {res["title"]} at {ts}')
+                tmp_val += f'{res["id"]}: {res["title"]} at {ts}\n'
             else:
                 ts = utils.human_timedelta_short(res["notify_ts"])
-                tmp_val.append(f'{res["id"]}: {res["title"]} {ts}')
-        for i, p in enumerate(utils.paginate("\n".join(tmp_val))):
+                tmp_val += f'{res["id"]}: {res["title"]} {ts}\n'
+        for i, p in enumerate(utils.paginate(tmp_val)):
             if i == 0:
                 await ctx.send("Reminder summary:\n" + p)
                 continue
@@ -177,13 +209,16 @@ class Reminders(commands.Cog, name="Reminders"):
             return
 
         embed = await self.reminder_show_item(res, ctx)
-        embed.set_author(name="Todo Item Show", icon_url=str(ctx.author.avatar_url))
+        embed.set_author(name="Reminder Show", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
     async def reminder_show_item(self, res: asyncpg.Record, ctx: Context = None, utc=False, firing=False):
         """Returns an embed for `res` PSQL query"""
         added = self.format_dt_tz(res['added'])
-        tmp_val = f"Added: {added}\n"
+        tmp_val = ""
+        if res['description']:
+            tmp_val += f"Description: {res['description']}\n"
+        tmp_val += f"Added: {added}\n"
         if not firing:
             notify_ts = self.format_dt_tz(res['notify_ts'])
             tmp_val += f"Notify at: {notify_ts}\n"
@@ -191,15 +226,25 @@ class Reminders(commands.Cog, name="Reminders"):
             tmp_val += f"Updated: {self.format_dt_tz(res['updated'])}\n"
         if res['repeat']:
             tmp_val += f"Repeat: {utils.human_seconds(res['repeat'])}\n"
+        if res['repeat_n']:
+            tmp_val += f"Repeats left: {res['repeat_n']}\n"
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
         embed.set_footer(
-            text=f"Time is {'in UTC' if utc else 'local'}, date format dd.mm.yy",
+            text=f"{'UTC' if utc else 'Local'}; dd.mm.yy",
             icon_url=str(self.bot.user.avatar_url),
         )
-        embed.add_field(name=f"{res['id']}. {res['title']}",
-                        value=tmp_val,
-                        inline=False)
+        if res['failed']:
+            tmp_name = "❌ "
+        elif res['done']:
+            tmp_name = "✅ "
+        else:
+            tmp_name = ""
+        embed.add_field(
+            name=f"{tmp_name}{res['id']}. {res['title']}",
+            value=tmp_val,
+            inline=False,
+        )
         if res['recipients'] and not firing:
             names = []
             for r in res['recipients']:
@@ -221,7 +266,7 @@ class Reminders(commands.Cog, name="Reminders"):
         if not res:
             await ctx.send(f"No reminder with index {ctx.parsed.index} found")
             return None
-        if not res['owner_id'] == ctx.author.id or ctx.author.id in res['recipients']:
+        if not res['owner_id'] == ctx.author.id and ctx.author.id not in res['recipients']:
             await ctx.send(f"Reminder with index {ctx.parsed.index} isn't yours")
             return None
         return res
@@ -233,60 +278,71 @@ class Reminders(commands.Cog, name="Reminders"):
         return dt.replace(tzinfo=timezone.utc).astimezone().strftime(cfg.TIME_FORMAT)
 
     async def refresh_worker(self):
-        if self._sleep_task:
+        if self._sleep_task is not None and not self._sleep_task.done():
             self._sleep_task.cancel()
-        async with self.bot.pool.acquire() as con:
-            q = f"SELECT * FROM {self.psql_table_name} WHERE fired=false AND failed=false ORDER BY notify_ts ASC LIMIT 1"
-            results = await con.fetch(q)
-        if not results:
+        while True:
+            try:
+                async with self.bot.pool.acquire() as con:
+                    q = f"SELECT * FROM {self.psql_table_name} WHERE done=false AND failed=false ORDER BY notify_ts ASC LIMIT 1"
+                    res = await con.fetchrow(q)
+                break
+            except asyncpg.exceptions.PostgresConnectionError as e:
+                self.logger.warning("Cannot refresh worker: %s", str(e))
+                await asyncio.sleep(5)
+        if not res:
+            self.logger.debug("No remaining reminders")
             return
-        self.bot.loop.create_task(self.sleep_worker(results))
+        self.logger.debug("Starting sleep task for reminder %d", res['id'])
+        self._sleep_task = self.bot.loop.create_task(self.sleep_worker(res))
 
     async def fire_reminder(self, res: asyncpg.Record):
-        ch = self.bot.get_channel(res['channel_id'])
-        q_failed = f"UPDATE {self.psql_table_name} SET failed=true WHERE id=$1"
-        embed = await self.reminder_show_item(res, firing=True)
-        repeat_td = timedelta(seconds=res['repeat']) if res['repeat'] else None
-        self.logger.debug("Repeat: %s", repeat_td)
-        async with self.bot.pool.acquire() as con:
-            if not ch:
-                self.logger.warning("Could not find channel %s for reminder ID %d", res['channel_id'], res['id'])
-                await con.execute(q_failed, res['id'])
-                return
-            try:
-                mentions = [User(id_=res['owner_id']).mention()]
-                if res['recipients']:
-                    mentions += [User(id_=r).mention() for r in res['recipients']]
-                await ch.send(content=" ".join(mentions), embed=embed)
-                if repeat_td:
-                    new_dt = datetime.utcnow() + repeat_td
-                    self.logger.debug("New time for reminder %d: %s", res['id'], utils.human_timedelta_short(res['notify_ts']))
-                    q = f"UPDATE {self.psql_table_name} SET notify_ts=$2 WHERE id=$1"
-                    await con.execute(q, res['id'], new_dt)
-                    await self.refresh_worker()
-                else:
-                    q = f"UPDATE {self.psql_table_name} SET fired=true WHERE id=$1"
-                    await con.execute(q, res['id'])
-            except discord.DiscordException as e:
-                self.logger.error("Could not send reminder ID %d: %s", res['id'], str(e))
-                await con.execute(q_failed, res['id'])
+        try:
+            ch = self.bot.get_channel(res['channel_id'])
+            q_failed = f"UPDATE {self.psql_table_name} SET failed=true WHERE id=$1"
+            repeat_td = timedelta(seconds=res['repeat']) if res['repeat'] else None
+            repeat_n = res['repeat_n']
+            self.logger.debug("Repeat: %s", utils.human_seconds(res['repeat']) if res['repeat'] else 'N/A')
+            async with self.bot.pool.acquire() as con:
+                if not ch:
+                    self.logger.error("Could not find channel %s for reminder ID %d", res['channel_id'], res['id'])
+                    await con.execute(q_failed, res['id'])
+                    return
+                try:
+                    mentions = [User(id_=res['owner_id']).mention()]
+                    if res['recipients']:
+                        mentions += [User(id_=r).mention() for r in res['recipients']]
+                    if repeat_td and (repeat_n is None or repeat_n > 1):
+                        new_repeat_n = repeat_n - 1 if repeat_n else None
+                        new_dt = datetime.utcnow() + repeat_td
+                        self.logger.debug("New time for reminder %d: %s", res['id'], utils.human_timedelta_short(new_dt))
+                        q = f"UPDATE {self.psql_table_name} SET notify_ts=$2,repeat_n=$3 WHERE id=$1"
+                        await con.execute(q, res['id'], new_dt, new_repeat_n)
+                    else:
+                        q = f"UPDATE {self.psql_table_name} SET done=true,repeat_n=NULL WHERE id=$1"
+                        await con.execute(q, res['id'])
+                    q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
+                    new_res = await con.fetchrow(q, res['id'])
+                    embed = await self.reminder_show_item(new_res, firing=True)
+                    await ch.send(content=" ".join(mentions), embed=embed)
+                except discord.DiscordException as e:
+                    self.logger.error("Could not send reminder ID %d: %s", res['id'], str(e))
+                    await con.execute(q_failed, res['id'])
+        finally:
+            await self.refresh_worker()
 
-    async def sleep_worker(self, results: List[asyncpg.Record]):
-        for r in results:
+    async def sleep_worker(self, r: asyncpg.Record):
+        try:
             start = datetime.utcnow()
             if start >= r['notify_ts']:
-                self.logger.debug("Got reminder from the past [%s], firing immediately", utils.human_timedelta_short(r['notify_ts']))
-                await self.fire_reminder(r)
-                continue
-            duration = abs((start - r['notify_ts']).total_seconds())
-            try:
-                self.logger.debug("Sleep task starting, %s [%d seconds]", utils.human_seconds(duration), duration)
-                await asyncio.sleep(duration)
-                await self.fire_reminder(r)
-            except asyncio.CancelledError:
-                ran_for = (datetime.utcnow() - start).total_seconds()
-                self.logger.debug("Sleep task cancelled, %s remaining", utils.human_seconds(ran_for))
+                self.logger.debug("Reminder %d overdue [%s]", r['id'], utils.human_timedelta_short(r['notify_ts']))
+                self.bot.loop.create_task(self.fire_reminder(r))
                 return
+            duration = abs((start - r['notify_ts']).total_seconds())
+            self.logger.debug("Reminder %d due in %s [%d seconds]", r['id'], utils.human_seconds(duration), duration)
+            await asyncio.sleep(duration)
+            self.bot.loop.create_task(self.fire_reminder(r))
+        except asyncio.CancelledError:
+            return
 
 
 def setup(bot):
