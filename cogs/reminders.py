@@ -84,49 +84,17 @@ class Reminders(commands.Cog, name="Reminders"):
     async def reminder_add(self, ctx: Context):
         title = ' '.join(ctx.parsed.title)
         description = ' '.join(ctx.parsed.description) if ctx.parsed.description else None
-        timestamp = ' '.join(ctx.parsed.timestamp)
-        repeat = ' '.join(ctx.parsed.repeat) if ctx.parsed.repeat else None
-        repeat_n = ctx.parsed.repeat_times
-        recipients = ctx.parsed.recipients or []
-        channel = ctx.parsed.channel or str(ctx.channel.id)
         # Try to parse
-        # This will interpret absolute times as UTC
-        # parsed_ts = dateparser.parse(timestamp, settings={'TIMEZONE': 'UTC', 'RETURN_AS_TIMEZONE_AWARE': False})
-        parsed_ts = dateparser.parse(timestamp, settings={'PREFER_DATES_FROM': 'future', 'DATE_ORDER': 'DMY'})
-        parsed_repeat = None
-        if not parsed_ts:
-            return await ctx.send(f'Could not parse timestamp "{timestamp}"')
-        if datetime.utcnow() >= parsed_ts:
-            return await ctx.send(f'Reminder time cannot be in the past: {parsed_ts.strftime(cfg.TIME_FORMAT)}')
-        # Interpret commands as local time, but store UTC
-        parsed_ts = parsed_ts.astimezone(tz=timezone.utc).replace(tzinfo=None)
-        if repeat:
-            parsed_repeat = pytimeparse.parse(repeat)
-            if not parsed_repeat:
-                return await ctx.send(f'Could not parse repeat interval "{repeat}"')
-            if repeat_n and repeat_n <= 0:
-                return await ctx.send('Number of repeats must be a positive number')
-        ch_conv = commands.TextChannelConverter()
-        try:
-            channel = await ch_conv.convert(ctx, channel)
-        except commands.ChannelNotFound:
-            return await ctx.send(f"No channel {channel} found.")
-        users = []
-        for r in recipients:
-            u = await User.from_search(ctx, r)
-            if not u:
-                return await ctx.send(f'Could not find user {r}')
-            # Silently ignore self
-            if u.id == ctx.author.id:
-                continue
-            users.append(u.id)
-
+        parse_ret = await self.parse_reminder_args(ctx)
+        if isinstance(parse_ret, discord.Message):
+            return
+        parsed_ts, parsed_repeat, channel, users = parse_ret
         async with self.bot.pool.acquire() as con:
             q = (f"INSERT INTO {self.psql_table_name} (title, description, recipients, notify_ts, repeat, repeat_n, owner_id, channel_id) "
                  "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
             for _ in range(2):
                 try:
-                    await con.execute(q, title, description, users, parsed_ts, parsed_repeat, repeat_n, ctx.author.id, channel.id)
+                    await con.execute(q, title, description, users, parsed_ts, parsed_repeat, ctx.parsed.repeat_times, ctx.author.id, channel.id)
                     break
                 except asyncpg.exceptions.ForeignKeyViolationError:
                     user_ok = await ensure_foreign_key(con=con, obj=User.from_discord(ctx.author), logger=self.logger)
@@ -178,7 +146,77 @@ class Reminders(commands.Cog, name="Reminders"):
             await ctx.send(p)
 
     @reminder.command(
+        name='edit',
+        brief='Edit a reminder by index',
+        parser_args=[
+            parsers.Arg('index', type=int, help='Item number'),
+            parsers.Arg('--title', '-s', default=None, nargs='*', help='Main item content'),
+            parsers.Arg('--description', '-d', default=None, nargs='*', help='Description'),
+            parsers.Arg('--timestamp', '-t', default=None, nargs='*', help='Time for notification'),
+            parsers.Arg('--channel', '-c', default=None, help='Channel to send on'),
+            parsers.Arg('--repeat', '-r', default=None, nargs='*', help='Repeat interval'),
+            parsers.Arg('--repeat-times', '-n', default=None, type=int, help='Number of times to repeat'),
+            parsers.Arg('--recipients', '-u', default=None, nargs='*', help='Users which will be notified (you will always be notified)'),
+        ],
+    )
+    async def reminder_edit(self, ctx: Context):
+        res = await self.get_reminder_item(ctx)
+        if not res:
+            return
+        parse_ret = await self.parse_reminder_args(ctx, editing=True)
+        if isinstance(parse_ret, discord.Message):
+            return
+        parsed_ts, parsed_repeat, channel, users = parse_ret
+        title = ' '.join(ctx.parsed.title) if ctx.parsed.title else None
+        description = ' '.join(ctx.parsed.description) if ctx.parsed.description else None
+        q = f"UPDATE {self.psql_table_name} SET "
+        q_args = []
+        q_tmp = []
+        if title:
+            q_args.append(title)
+            q_tmp.append(f"title=${len(q_args)}")
+        if description:
+            q_args.append(description)
+            q_tmp.append(f"description=${len(q_args)}")
+        if parsed_ts:
+            q_args.append(parsed_ts)
+            q_tmp.append(f"notify_ts=${len(q_args)}")
+        if parsed_repeat:
+            q_args.append(parsed_repeat)
+            q_tmp.append(f"repeat=${len(q_args)}")
+        if channel:
+            q_args.append(channel.id)
+            q_tmp.append(f"channel_id=${len(q_args)}")
+        if users:
+            q_args.append(users)
+            q_tmp.append(f"recipients=${len(q_args)}")
+        if len(q_args) == 0:
+            return await ctx.send("You must specify something to edit.")
+        q += ','.join(q_tmp)
+        q_args.append(ctx.parsed.index)
+        q += f" WHERE id=${len(q_args)}"
+        async with self.bot.pool.acquire() as con:
+            for _ in range(2):
+                try:
+                    await con.execute(q, *q_args)
+                    break
+                except asyncpg.exceptions.ForeignKeyViolationError:
+                    user_ok = await ensure_foreign_key(con=con, obj=User.from_discord(ctx.author), logger=self.logger)
+                    ch_ok = await ensure_foreign_key(con=con, obj=Channel.from_discord(channel), logger=self.logger)
+                    if not user_ok or not ch_ok:
+                        return await ctx.send("Database error, could not add user or channel.")
+            await self.refresh_worker()
+            # Fetch what we just added for display
+            q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
+            res = await con.fetchrow(q, ctx.parsed.index)
+        await self.refresh_worker()
+        embed = await self.reminder_show_item(res, ctx)
+        embed.set_author(name="Reminder Edited", icon_url=str(ctx.author.avatar_url))
+        return await ctx.send(embed=embed)
+
+    @reminder.command(
         name='del',
+        aliases=['delete', 'rm', 'remove'],
         brief='Delete a reminder by index',
         parser_args=[
             parsers.Arg('index', type=int, help='Item number'),
@@ -279,6 +317,51 @@ class Reminders(commands.Cog, name="Reminders"):
         if utc:
             return dt.strftime(cfg.TIME_FORMAT)
         return dt.replace(tzinfo=timezone.utc).astimezone().strftime(cfg.TIME_FORMAT)
+
+    @staticmethod
+    async def parse_reminder_args(ctx: Context, editing=False):
+        timestamp = ' '.join(ctx.parsed.timestamp) if ctx.parsed.timestamp else None
+        repeat = ' '.join(ctx.parsed.repeat) if ctx.parsed.repeat else None
+        repeat_n = ctx.parsed.repeat_times
+        recipients = ctx.parsed.recipients or []
+        channel = ctx.parsed.channel
+        if not editing and not channel:
+            channel = str(ctx.channel.id)
+        # This will interpret absolute times as UTC
+        # parsed_ts = dateparser.parse(timestamp, settings={'TIMEZONE': 'UTC', 'RETURN_AS_TIMEZONE_AWARE': False})
+        parsed_ts = None
+        if timestamp is not None:
+            parsed_ts = dateparser.parse(timestamp, settings={'PREFER_DATES_FROM': 'future', 'DATE_ORDER': 'DMY'})
+        if not parsed_ts and (not editing or timestamp):
+            return await ctx.send(f'Could not parse timestamp "{timestamp}"')
+        elif parsed_ts:
+            # Interpret commands as local time, but store UTC
+            parsed_ts = parsed_ts.astimezone(tz=timezone.utc).replace(tzinfo=None)
+            if datetime.utcnow() >= parsed_ts:
+                return await ctx.send(f'Reminder time cannot be in the past: {parsed_ts.strftime(cfg.TIME_FORMAT)}')
+        parsed_repeat = None
+        if repeat:
+            parsed_repeat = pytimeparse.parse(repeat)
+            if not parsed_repeat:
+                return await ctx.send(f'Could not parse repeat interval "{repeat}"')
+            if repeat_n and repeat_n <= 0:
+                return await ctx.send('Number of repeats must be a positive number')
+        if channel:
+            ch_conv = commands.TextChannelConverter()
+            try:
+                channel = await ch_conv.convert(ctx, channel)
+            except commands.ChannelNotFound:
+                return await ctx.send(f"No channel {channel} found.")
+        users = []
+        for r in recipients:
+            u = await User.from_search(ctx, r)
+            if not u:
+                return await ctx.send(f'Could not find user {r}')
+            # Silently ignore self
+            if u.id == ctx.author.id:
+                continue
+            users.append(u.id)
+        return parsed_ts, parsed_repeat, channel, users
 
     async def refresh_worker(self):
         if self._sleep_task is not None and not self._sleep_task.done():
