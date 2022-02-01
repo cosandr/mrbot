@@ -240,6 +240,9 @@ class Reminders(commands.Cog, name="Reminders"):
             tmp_name = "✅ "
         else:
             tmp_name = ""
+        if not firing:
+            ch = self.bot.get_channel(res['channel_id'])
+            tmp_val += f"Channel: {ch.mention if ch else 'N/A'}"
         embed.add_field(
             name=f"{tmp_name}{res['id']}. {res['title']}",
             value=tmp_val,
