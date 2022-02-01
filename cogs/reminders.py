@@ -190,6 +190,13 @@ class Reminders(commands.Cog, name="Reminders"):
         if users:
             q_args.append(users)
             q_tmp.append(f"recipients=${len(q_args)}")
+        if ctx.parsed.repeat_times is not None:
+            if not res['repeat'] and not parsed_repeat:
+                return await ctx.send("Reminder does not repeat, cannot change number of repetitions.")
+            if ctx.parsed.repeat_times <= 0:
+                return await ctx.send('Number of repeats must be a positive number')
+            q_args.append(ctx.parsed.repeat_times)
+            q_tmp.append(f"repeat_n=${len(q_args)}")
         if len(q_args) == 0:
             return await ctx.send("You must specify something to edit.")
         q += ','.join(q_tmp)
