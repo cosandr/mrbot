@@ -31,11 +31,11 @@ class Reminders(commands.Cog, name="Reminders"):
             title       TEXT NOT NULL,
             description TEXT,
             recipients  BIGINT [],
-            notify_ts   TIMESTAMP NOT NULL,
+            notify_ts   TIMESTAMPTZ NOT NULL,
             repeat      BIGINT,
             repeat_n    INTEGER,
-            updated     TIMESTAMP,
-            added       TIMESTAMP DEFAULT (NOW() at time zone 'utc'),
+            updated     TIMESTAMPTZ,
+            added       TIMESTAMPTZ DEFAULT NOW(),
             done        BOOLEAN DEFAULT false,
             failed      BOOLEAN DEFAULT false,
             owner_id    BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
@@ -342,9 +342,7 @@ class Reminders(commands.Cog, name="Reminders"):
         if not parsed_ts and (not editing or timestamp):
             return await ctx.send(f'Could not parse timestamp "{timestamp}"')
         elif parsed_ts:
-            # Interpret commands as local time, but store UTC
-            parsed_ts = parsed_ts.astimezone(tz=timezone.utc).replace(tzinfo=None)
-            if datetime.utcnow() >= parsed_ts:
+            if datetime.now(timezone.utc) >= parsed_ts:
                 return await ctx.send(f'Reminder time cannot be in the past: {parsed_ts.strftime(cfg.TIME_FORMAT)}')
         parsed_repeat = None
         if repeat:
@@ -406,7 +404,7 @@ class Reminders(commands.Cog, name="Reminders"):
                         mentions += [User(id_=r).mention() for r in res['recipients']]
                     if repeat_td and (repeat_n is None or repeat_n > 1):
                         new_repeat_n = repeat_n - 1 if repeat_n else None
-                        new_dt = datetime.utcnow() + repeat_td
+                        new_dt = datetime.now(timezone.utc) + repeat_td
                         self.logger.debug("New time for reminder %d: %s", res['id'], utils.human_timedelta_short(new_dt))
                         q = f"UPDATE {self.psql_table_name} SET notify_ts=$2,repeat_n=$3 WHERE id=$1"
                         await con.execute(q, res['id'], new_dt, new_repeat_n)
@@ -425,7 +423,7 @@ class Reminders(commands.Cog, name="Reminders"):
 
     async def sleep_worker(self, r: asyncpg.Record):
         try:
-            start = datetime.utcnow()
+            start = datetime.now(timezone.utc)
             if start >= r['notify_ts']:
                 self.logger.debug("Reminder %d overdue [%s]", r['id'], utils.human_timedelta_short(r['notify_ts']))
                 self.bot.loop.create_task(self.fire_reminder(r))

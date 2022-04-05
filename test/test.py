@@ -29,9 +29,24 @@ class Test:
         # await self.create_all_tables()
         # await self.copy_tables(num_cons=24, max_elem=1000)
         # await self.insert_config_json_psql()
-        config = await BotConfig.from_psql(dsn=self.bot.config.psql.main, extra=['test', 'windows'])
-        print(config.safe_repr())
+        # config = await BotConfig.from_psql(dsn=self.bot.config.psql.main, extra=['test', 'windows'])
+        # print(config.safe_repr())
         # await self.run_plot()
+        await self.asyncpg_tz_converter()
+
+    async def asyncpg_tz_converter(self):
+        from datetime import datetime, timezone
+
+        async with self.bot.pool.acquire() as con:
+            await con.execute("CREATE TABLE IF NOT EXISTS test_tz(aware timestamptz, naive timestamp, converted timestamptz)")
+            naive = datetime.utcnow()
+            aware = datetime.now(tz=timezone.utc)
+            converted = datetime.utcnow()
+            await con.execute("INSERT INTO test_tz (aware, naive, converted) VALUES ($1, $2, $3)", aware, naive, converted)
+            aware_new, naive_new, converted_new = await con.fetchrow("SELECT aware, naive, converted FROM test_tz WHERE naive=$1", naive)
+        print(aware_new)
+        print(naive_new)
+        print(converted_new)
 
     async def insert_config_json_psql(self, live=False):
         """Reads and inserts all .json files in config directory"""

@@ -1,7 +1,7 @@
 import math
 import re
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from typing import Sequence, Optional, List, Tuple, MappingView, Set, Union
@@ -273,7 +273,9 @@ def human_timedelta(dt: datetime, max_vals: int = 3) -> str:
         'second': 1
     }
     ret_str = ""
-    seconds = (datetime.utcnow()-dt).total_seconds()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    seconds = (datetime.now(timezone.utc) - dt).total_seconds()
     past = seconds > 0
     seconds = abs(seconds)
     if seconds < 1:
@@ -314,7 +316,9 @@ def human_timedelta_short(dt: datetime, max_vals: int = 3) -> str:
         's': 1
     }
     ret_str = ""
-    seconds = (datetime.utcnow()-dt).total_seconds()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    seconds = (datetime.now(timezone.utc) - dt).total_seconds()
     past = seconds > 0
     seconds = abs(seconds)
     if seconds < 1:

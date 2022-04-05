@@ -27,7 +27,7 @@ class Message(Common):
     psql_table = f"""
         CREATE TABLE IF NOT EXISTS {psql_table_name} (
             content     VARCHAR(2000),
-            time        TIMESTAMP NOT NULL,
+            time        TIMESTAMPTZ NOT NULL,
             deleted     BOOLEAN DEFAULT false,
             edited      BOOLEAN DEFAULT false,
             msg_id      BIGINT UNIQUE NOT NULL,
@@ -40,7 +40,7 @@ class Message(Common):
         );
         CREATE TABLE IF NOT EXISTS {psql_table_name_edits} (
             content     VARCHAR(2000),
-            time        TIMESTAMP NOT NULL,
+            time        TIMESTAMPTZ NOT NULL,
             attachments TEXT [],
             embed       JSONB,
             msg_id      BIGINT NOT NULL REFERENCES {psql_table_name} (msg_id) ON DELETE CASCADE,

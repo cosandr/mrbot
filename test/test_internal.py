@@ -3,7 +3,7 @@ import itertools
 import random
 import time
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 import asyncpg
@@ -201,7 +201,7 @@ class InternalTests(unittest.TestCase):
         u1 = User(100, name='User 1')
         u2 = User(100, name='User 1')
         self.assertEqual(u1, u2)
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
         u1 = User(100, name='User', status_time=dt, online=True)
         u2 = User(100, name='User', status_time=dt, online=True)
         self.assertEqual(u1, u2)
@@ -222,7 +222,7 @@ class InternalTests(unittest.TestCase):
         self.assertNotEqual(u1, u2)
 
     def test_user_diff_tol(self):
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
         dt_later = dt + timedelta(hours=1)
         # No online/offline
         u1 = User(100)
@@ -278,7 +278,7 @@ class InternalTests(unittest.TestCase):
         u1 = User(100, name='User 1')
         u2 = User(100, name='User 2')
         self.assertSetEqual(u1.diff(u2), {'name'})
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
         dt_later = dt + timedelta(seconds=10)
         u1 = User(100, name='User', status_time=dt, online=True)
         u2 = User(100, name='User', status_time=dt, online=True)
@@ -306,7 +306,7 @@ class InternalTests(unittest.TestCase):
         test_edited = 'edited message 1'
         msg = Message(
             id_=123,
-            time_=datetime.utcnow(),
+            time_=datetime.now(timezone.utc),
             content=test_content,
             author=User(id_=153882790599852032),
             channel=Channel(id_=422101180236300306),

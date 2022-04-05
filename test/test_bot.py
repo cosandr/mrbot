@@ -8,6 +8,7 @@ import discord
 from aiohttp import ClientSession
 
 from config import BotConfig
+from ext.psql import asyncpg_con_init
 from mrbot import MrBot
 
 
@@ -69,7 +70,7 @@ class TestBot(MrBot):
 
     async def async_init(self, con_live=False, con_pub=False):
         self.aio_sess = ClientSession()
-        self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, max_size=32)
+        self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init, max_size=32)
         live_dsn = self.config.psql.live
         public_dsn = self.config.psql.public
         if con_live:

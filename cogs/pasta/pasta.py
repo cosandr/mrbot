@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple
 
 import asyncpg
@@ -16,7 +16,7 @@ class Pasta:
             content   TEXT NOT NULL,
             user_id   BIGINT REFERENCES {User.psql_table_name} (id),
             guild_id  BIGINT REFERENCES {Guild.psql_table_name} (id),
-            added     TIMESTAMP DEFAULT NOW()
+            added     TIMESTAMPTZ DEFAULT NOW()
         );
     """
     # Depends on Guild and User tables
@@ -29,7 +29,7 @@ class Pasta:
         self.content: str = content
         self.user: User = user
         self.guild: Guild = guild
-        self.added: datetime = added if added else datetime.utcnow()
+        self.added: datetime = added if added else datetime.now(timezone.utc)
 
     def __eq__(self, other):
         if not isinstance(other, Pasta):

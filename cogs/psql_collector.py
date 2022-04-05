@@ -6,7 +6,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Optional, Union, Dict
 
 import asyncpg
@@ -36,14 +36,14 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     psql_table_name_command_log = 'command_log'
     psql_table = f"""
         CREATE TABLE IF NOT EXISTS {psql_table_name_typed} (
-            time      TIMESTAMP NOT NULL,
+            time      TIMESTAMPTZ NOT NULL,
             user_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
             ch_id     BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
             guild_id  BIGINT REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS {psql_table_name_voice} (
             connected  BOOLEAN NOT NULL,
-            time       TIMESTAMP NOT NULL,
+            time       TIMESTAMPTZ NOT NULL,
             user_id    BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
             ch_id      BIGINT NOT NULL REFERENCES {Channel.psql_table_name} (id) ON DELETE CASCADE,
             guild_id   BIGINT NOT NULL REFERENCES {Guild.psql_table_name} (id) ON DELETE CASCADE
@@ -51,7 +51,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         CREATE TABLE IF NOT EXISTS {psql_table_name_command_log} (
             name     VARCHAR(200) NOT NULL,
             cog_name VARCHAR(100),
-            time     TIMESTAMP NOT NULL,
+            time     TIMESTAMPTZ NOT NULL,
             ran_for  REAL,
             bot_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
             user_id  BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE,
@@ -132,7 +132,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         if user.discriminator == '0000':
             return
         # Check last update time
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if last_typed := self._cache.typed.get(user.id):
             if now - last_typed < self._type_interval:
                 return
@@ -152,11 +152,11 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
              '(connected, time, user_id, ch_id, guild_id) VALUES ($1, $2, $3, $4, $5)')
         # User connected to channel
         if after.channel:
-            q_args = [True, datetime.utcnow(), member.id, after.channel.id, after.channel.guild.id]
+            q_args = [True, datetime.now(timezone.utc), member.id, after.channel.id, after.channel.guild.id]
             channel = Channel.from_discord(after.channel)
         # User disconnected
         elif before.channel:
-            q_args = [False, datetime.utcnow(), member.id, before.channel.id, before.channel.guild.id]
+            q_args = [False, datetime.now(timezone.utc), member.id, before.channel.id, before.channel.guild.id]
             channel = Channel.from_discord(before.channel)
         else:
             return
@@ -192,9 +192,9 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
             return
         user = User.from_discord(after)
         if before.status != after.status:
-            user.status_time = datetime.utcnow()
+            user.status_time = datetime.now(timezone.utc)
         if before.activity != after.activity:
-            user.activity_time = datetime.utcnow()
+            user.activity_time = datetime.now(timezone.utc)
 
         # Ignore activities for bots
         if after.bot:

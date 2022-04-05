@@ -4,7 +4,7 @@ import asyncio
 import itertools
 import logging
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 import discord
@@ -29,7 +29,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
             player  pepe_player NOT NULL,
             stats   pepe_stats,
             units   pepe_units,
-            updated TIMESTAMP DEFAULT NOW()
+            updated TIMESTAMPTZ DEFAULT NOW()
         );
         CREATE OR REPLACE FUNCTION update_{psql_table_name}() RETURNS trigger AS $$
         BEGIN
@@ -291,22 +291,22 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
                 await self.add_new_player(
                     con,
                     player=dict(name=ctx.author.display_name, id=ctx.author.id, coins=self.claim_base),
-                    stats=dict(claim_time=datetime.utcnow()),
+                    stats=dict(claim_time=datetime.now(timezone.utc)),
                 )
                 has_claimed = True
             q = f"UPDATE {self.psql_table_name} SET player.coins=(player).coins+$2, stats.claim_time=$3, stats.streak=$4 WHERE (player).id=$1"
             # Player never claimed before
             if not has_claimed and not res['claim_time']:
-                await con.execute(q, ctx.author.id, claim_amount, datetime.utcnow(), 1)
+                await con.execute(q, ctx.author.id, claim_amount, datetime.now(timezone.utc), 1)
                 has_claimed = True
             elif not has_claimed:
-                delta_dt = datetime.utcnow() - res['claim_time']
+                delta_dt = datetime.now(timezone.utc) - res['claim_time']
                 if delta_dt >= self.claim_reset:
-                    await con.execute(q, ctx.author.id, self.claim_base, datetime.utcnow(), 1)
+                    await con.execute(q, ctx.author.id, self.claim_base, datetime.now(timezone.utc), 1)
                     has_claimed = True
                 elif delta_dt >= self.claim_wait:
                     claim_amount = int(self.claim_base*(1.05**res['streak']))
-                    await con.execute(q, ctx.author.id, claim_amount, datetime.utcnow(), res['streak']+1)
+                    await con.execute(q, ctx.author.id, claim_amount, datetime.now(timezone.utc), res['streak']+1)
                     has_claimed = True
             q = f"SELECT (player).coins,(stats).streak,(stats).claim_time FROM {self.psql_table_name} WHERE (player).id=$1"
             res = await con.fetchrow(q, ctx.author.id)
@@ -317,7 +317,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
                 embed.add_field(name="Claim", value=f"Streak: {res['streak']}\nClaimed: {human_large_num(claim_amount)}", inline=False)
                 await ctx.send(embed=embed)
             else:
-                wait_td = (res['claim_time'] + self.claim_wait) - datetime.utcnow()
+                wait_td = (res['claim_time'] + self.claim_wait) - datetime.now(timezone.utc)
                 embed.colour = discord.Colour.red()
                 embed.set_footer(text="Claim failed", icon_url=embed.footer.icon_url)
                 embed.add_field(name="Coins", value=f"{human_large_num(res['coins'])}", inline=True)
@@ -455,7 +455,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
             await msg.edit(embed=embed)
             await asyncio.sleep(1)
         await con.execute(f"UPDATE {self.psql_table_name} SET stats.tcoins=(stats).tcoins+$2,stats.last_tick=$3 WHERE (player).id=$1",
-                          p_id, pu.tick(p), datetime.utcnow())
+                          p_id, pu.tick(p), datetime.now(timezone.utc))
         await self.bot.pool.release(con)
         self.logger.info(f"Info end for {p_id}.")
         embed.title = f"Display stopped."

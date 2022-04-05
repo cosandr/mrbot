@@ -45,8 +45,8 @@ class Misc(commands.Cog, name="Miscellaneous"):
         CREATE TABLE IF NOT EXISTS {psql_table_name_web} (
             name    VARCHAR(200) PRIMARY KEY,
             content TEXT NOT NULL,
-            created TIMESTAMP DEFAULT NOW(),
-            updated TIMESTAMP DEFAULT NOW()
+            created TIMESTAMPTZ DEFAULT NOW(),
+            updated TIMESTAMPTZ DEFAULT NOW()
         );
         CREATE OR REPLACE FUNCTION update_{psql_table_name_web}()
             RETURNS TRIGGER AS $$

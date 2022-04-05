@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Union, Tuple, List, Optional, Dict, Set
 
 import asyncpg
@@ -38,13 +37,13 @@ class User(Common):
         );
         CREATE TABLE IF NOT EXISTS {psql_table_name_activities} (
             activity TEXT,
-            time     TIMESTAMP NOT NULL DEFAULT NOW(),
+            time     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             user_id  BIGINT NOT NULL REFERENCES {psql_table_name} (id) ON DELETE CASCADE
         );
         CREATE TABLE IF NOT EXISTS {psql_table_name_status} (
             online   BOOLEAN NOT NULL,
             mobile   BOOLEAN NOT NULL DEFAULT false,
-            time     TIMESTAMP NOT NULL DEFAULT NOW(),
+            time     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             user_id  BIGINT NOT NULL REFERENCES {psql_table_name} (id) ON DELETE CASCADE
         );
     """
@@ -191,7 +190,7 @@ class User(Common):
         """Returns a query to insert/update user activities table"""
         q = (f'INSERT INTO {self.psql_table_name_activities} '
              '(user_id, activity, time) VALUES ($1, $2, $3)')
-        q_args = [self.id, self.activity, self.activity_time or datetime.utcnow()]
+        q_args = [self.id, self.activity, self.activity_time or datetime.now(timezone.utc)]
         return q, q_args
 
     def to_psql_status(self) -> Tuple[str, list]:
@@ -200,7 +199,7 @@ class User(Common):
              '(user_id, online, mobile, time) VALUES ($1, $2, $3, $4)')
         # Assume online if we don't have it, presumably user was online if their status changed
         online = True if self.online is None else self.online
-        q_args = [self.id, online, self.mobile, self.status_time or datetime.utcnow()]
+        q_args = [self.id, online, self.mobile, self.status_time or datetime.now(timezone.utc)]
         return q, q_args
 
     async def to_discord(self, ctx: Union[MrBot, Context], guild_id: int = None) -> Optional[Union[discord.Member, discord.User]]:

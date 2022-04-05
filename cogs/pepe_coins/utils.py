@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Tuple, Union
 
@@ -18,7 +18,7 @@ unit_param: Dict[str, Dict[str, Union[str, int, float]]] = {
 
 sql_ref: Dict[str, Dict[str, str]] = {
     "player": {"name": "VARCHAR(200)", "id": "BIGINT", "coins": "NUMERIC(50, 0)"},
-    "stats": {"claim_time": "TIMESTAMP", "streak": "INTEGER", "last_tick": "TIMESTAMP", "tcoins": "NUMERIC(50, 0)"},
+    "stats": {"claim_time": "TIMESTAMPTZ", "streak": "INTEGER", "last_tick": "TIMESTAMPTZ", "tcoins": "NUMERIC(50, 0)"},
     "base_unit": {"count": "INTEGER", "level": "INTEGER"},
     "units": {unit: "pepe_base_unit" for unit in unit_param.keys()}
 }
@@ -27,7 +27,7 @@ sql_ref: Dict[str, Dict[str, str]] = {
 units_struc: Dict[str, Dict[str, int]] = {unit: dict.fromkeys(sql_ref['base_unit'], 0) for unit in unit_param.keys()}
 stats_struc: Dict[str, Union[datetime, int, Decimal, None]] = {}
 for k, v in sql_ref['stats'].items():
-    if v == "TIMESTAMP":
+    if v == "TIMESTAMPTZ":
         stats_struc[k] = None
     else:
         stats_struc[k] = 0
@@ -96,7 +96,7 @@ def cps(psql_res: asyncpg.Record) -> float:
 
 def tick(psql_res: asyncpg.Record) -> float:
     if psql_res['last_tick']:
-        td = datetime.utcnow() - psql_res['last_tick']
+        td = datetime.now(timezone.utc) - psql_res['last_tick']
         print(td)
         return cps(psql_res['units'])*td.seconds
     else:

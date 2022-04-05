@@ -28,9 +28,9 @@ class Todo(commands.Cog, name="Todo"):
             priority  SMALLINT NOT NULL DEFAULT 2,
             title     TEXT NOT NULL,
             extra     TEXT,
-            done      TIMESTAMP,
-            updated   TIMESTAMP,
-            added     TIMESTAMP DEFAULT NOW(),
+            done      TIMESTAMPTZ,
+            updated   TIMESTAMPTZ,
+            added     TIMESTAMPTZ DEFAULT NOW(),
             user_id   BIGINT NOT NULL REFERENCES {User.psql_table_name} (id) ON DELETE CASCADE
         );
         CREATE OR REPLACE FUNCTION update_{psql_table_name}_time()

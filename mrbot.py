@@ -7,7 +7,7 @@ import re
 import signal
 import traceback
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import asyncpg
@@ -21,6 +21,7 @@ from ext.brains import Response, BrainsAPIError
 from ext.context import Context
 from ext.embed_helpers import embed_local_file
 from ext.errors import MissingConfigError
+from ext.psql import asyncpg_con_init
 from ext.utils import cleanup_http_params, human_seconds
 
 
@@ -97,7 +98,7 @@ class MrBot(commands.Bot):
 
     async def connect_sess(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
-        self.pool = await asyncpg.create_pool(dsn=self.config.psql.main)
+        self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init)
         # noinspection PyProtectedMember
         self.logger.info(f"Pool connected to database `{self.pool._working_params.database}`.")
         self.aio_sess = ClientSession()
@@ -169,13 +170,13 @@ class MrBot(commands.Bot):
             self._running_commands += 1
             self._busy_wake.set()
             if ctx.command:
-                start = datetime.utcnow()
+                start = datetime.now(timezone.utc)
             await self.invoke(ctx)
         finally:
             self._running_commands -= 1
             self._busy_wake.set()
             if start is not None:
-                ran_for = (datetime.utcnow() - start).total_seconds()
+                ran_for = (datetime.now(timezone.utc) - start).total_seconds()
                 self.dispatch('command_log_done', ctx, start, ran_for)
 
     @staticmethod

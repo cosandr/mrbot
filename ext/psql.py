@@ -1,15 +1,17 @@
 import asyncio
 import logging
 import re
+from datetime import datetime, timezone, timedelta
 from time import perf_counter
 from traceback import print_exception
-from typing import Union, Iterable
+from typing import Union, Iterable, Tuple
 
 import asyncpg
 
 from ext.internal import User, Guild, Message, Channel
 
 re_key = re.compile(r'Key.*is not present in table \"(\w+)\"\.')
+_asyncpg_ref = datetime(year=2000, month=1, day=1, tzinfo=timezone.utc)
 
 
 async def create_table(con: Union[asyncpg.pool.Pool, asyncpg.Connection], name: Union[str, Iterable],
@@ -201,3 +203,19 @@ def fill_query(q: str, args: list) -> str:
     for i in range(len(args)):
         comp_q = comp_q.replace(f"${i+1}", f"{{{i}}}")
     return comp_q.format(*args)
+
+
+async def asyncpg_con_init(con: asyncpg.Connection):
+
+    def encoder(dt: datetime):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (dt - _asyncpg_ref).total_seconds() * 1e6,
+
+    def decoder(data: Tuple[int]):
+        return _asyncpg_ref + timedelta(microseconds=data[0])
+
+    await con.set_type_codec(
+        'timestamptz', schema='pg_catalog',
+        encoder=encoder, decoder=decoder, format='tuple'
+    )
