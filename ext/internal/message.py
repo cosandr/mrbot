@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 import config as cfg
-from ext.utils import get_url, re_id, find_similar_str
+from ext.utils import get_url, re_id, find_similar_str, format_dt
 from .base import Common
 from .channel import Channel
 from .guild import Guild
@@ -189,17 +189,19 @@ class Message(Common):
 
     @property
     def local_time(self) -> datetime:
-        return self.time.replace(tzinfo=timezone.utc).astimezone(tz=None)
+        if self.time.tzinfo is None:
+            return self.time.replace(tzinfo=timezone.utc).astimezone(tz=None)
+        return self.time.astimezone(tz=None)
 
     @property
     def time_str(self) -> str:
         """Format timestamp as HH:MM - DD.MM.YY (UTC)"""
-        return self.time.strftime(cfg.TIME_FORMAT) + ' UTC'
+        return format_dt(self.time, cfg.TIME_FORMAT, 'UTC') + ' UTC'
 
     @property
     def local_time_str(self) -> str:
         """Format timestamp as HH:MM - DD.MM.YY (Local time)"""
-        return self.local_time.strftime(cfg.TIME_FORMAT)
+        return format_dt(self.time, cfg.TIME_FORMAT, cfg.TIME_ZONE)
 
     @property
     def is_pm(self) -> bool:

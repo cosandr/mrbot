@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
+import config as cfg
 from ext import utils
 from .incoming import Incoming
 from .response import Response
@@ -78,7 +79,7 @@ class Notifications(commands.Cog):
             self.logger.debug("Timer done, sending")
             # Send stuff in cache
             embed = utils.transparent_embed()
-            date_str = datetime.now().strftime('%d.%m.%y')
+            date_str = utils.format_dt(datetime.now(), '%d.%m.%y', cfg.TIME_ZONE)
             summary_str = utils.fmt_plural_str(sum(len(v) for v in self.inc_cache.values()), 'notification')
             embed.title = f'{summary_str} - {date_str}'
             for name, inc_list in self.inc_cache.items():

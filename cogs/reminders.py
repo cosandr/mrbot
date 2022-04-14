@@ -134,7 +134,7 @@ class Reminders(commands.Cog, name="Reminders"):
             elif res['done']:
                 tmp_val += "✅ "
             if ctx.parsed.absolute:
-                ts = self.format_dt_tz(res["notify_ts"])
+                ts = utils.format_dt(res['notify_ts'], cfg.TIME_FORMAT, cfg.TIME_ZONE)
                 tmp_val += f'{res["id"]}: {res["title"]} at {ts}\n'
             else:
                 ts = utils.human_timedelta_short(res["notify_ts"])
@@ -257,18 +257,19 @@ class Reminders(commands.Cog, name="Reminders"):
         embed.set_author(name="Reminder Show", icon_url=str(ctx.author.avatar_url))
         return await ctx.send(embed=embed)
 
-    async def reminder_show_item(self, res: asyncpg.Record, ctx: Context = None, utc=False, firing=False):
+    async def reminder_show_item(self, res: asyncpg.Record, ctx: Context = None, firing=False):
         """Returns an embed for `res` PSQL query"""
-        added = self.format_dt_tz(res['added'])
+        added = utils.format_dt(res['added'], cfg.TIME_FORMAT, cfg.TIME_ZONE)
         tmp_val = ""
         if res['description']:
             tmp_val += f"Description: {res['description']}\n"
         tmp_val += f"Added: {added}\n"
         if not firing:
-            notify_ts = self.format_dt_tz(res['notify_ts'])
+            notify_ts = utils.format_dt(res['notify_ts'], cfg.TIME_FORMAT, cfg.TIME_ZONE)
             tmp_val += f"Notify at: {notify_ts}\n"
         if res['updated'] is not None:
-            tmp_val += f"Updated: {self.format_dt_tz(res['updated'])}\n"
+            updated_ts = utils.format_dt(res['updated'], cfg.TIME_FORMAT, cfg.TIME_ZONE)
+            tmp_val += f"Updated: {updated_ts}\n"
         if res['repeat']:
             tmp_val += f"Repeat: {utils.human_seconds(res['repeat'])}\n"
         if res['repeat_n']:
@@ -276,7 +277,7 @@ class Reminders(commands.Cog, name="Reminders"):
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
         embed.set_footer(
-            text=f"{'UTC' if utc else 'Local'}; dd.mm.yy",
+            text=f"{cfg.TIME_ZONE}; dd.mm.yy",
             icon_url=str(self.bot.user.avatar_url),
         )
         if res['failed']:
@@ -320,12 +321,6 @@ class Reminders(commands.Cog, name="Reminders"):
         return res
 
     @staticmethod
-    def format_dt_tz(dt: datetime, utc=False) -> str:
-        if utc:
-            return dt.strftime(cfg.TIME_FORMAT)
-        return dt.replace(tzinfo=timezone.utc).astimezone().strftime(cfg.TIME_FORMAT)
-
-    @staticmethod
     async def parse_reminder_args(ctx: Context, editing=False):
         timestamp = ' '.join(ctx.parsed.timestamp) if ctx.parsed.timestamp else None
         repeat = ' '.join(ctx.parsed.repeat) if ctx.parsed.repeat else None
@@ -334,16 +329,15 @@ class Reminders(commands.Cog, name="Reminders"):
         channel = ctx.parsed.channel
         if not editing and not channel:
             channel = str(ctx.channel.id)
-        # This will interpret absolute times as UTC
-        # parsed_ts = dateparser.parse(timestamp, settings={'TIMEZONE': 'UTC', 'RETURN_AS_TIMEZONE_AWARE': False})
         parsed_ts = None
         if timestamp is not None:
-            parsed_ts = dateparser.parse(timestamp, settings={'PREFER_DATES_FROM': 'future', 'DATE_ORDER': 'DMY'})
+            parsed_ts = dateparser.parse(timestamp, settings={'TIMEZONE': cfg.TIME_ZONE, 'RETURN_AS_TIMEZONE_AWARE': True,
+                                                              'PREFER_DATES_FROM': 'future', 'DATE_ORDER': 'DMY'})
         if not parsed_ts and (not editing or timestamp):
             return await ctx.send(f'Could not parse timestamp "{timestamp}"')
         elif parsed_ts:
             if datetime.now(timezone.utc) >= parsed_ts:
-                return await ctx.send(f'Reminder time cannot be in the past: {parsed_ts.strftime(cfg.TIME_FORMAT)}')
+                return await ctx.send(f'Reminder time cannot be in the past: {utils.format_dt(parsed_ts, cfg.TIME_FORMAT, cfg.TIME_ZONE)}')
         parsed_repeat = None
         if repeat:
             parsed_repeat = pytimeparse.parse(repeat)

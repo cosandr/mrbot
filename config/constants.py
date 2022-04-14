@@ -13,6 +13,9 @@ DEFAULT_ROLE_COLOUR = 0x0165fc
 # Default datetime formatting
 TIME_FORMAT = '%H:%M - %d.%m.%y'
 
+# Default datetime timezone
+TIME_ZONE = 'Europe/Oslo'
+
 # Char to Unicode dict
 EMOJI_DICT = {
     "a": "\N{REGIONAL INDICATOR SYMBOL LETTER A}",

@@ -15,6 +15,7 @@ from ext.internal import User
 from ext.parsers import parsers
 from ext.parsers.errors import ArgParseError
 from ext.psql import create_table, ensure_foreign_key, debug_query
+from ext.utils import format_dt
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -88,19 +89,19 @@ class Todo(commands.Cog, name="Todo"):
             return await ctx.send(f"{ctx.author.display_name} doesn't have any entries in their todo list.")
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
-        embed.set_footer(text="Time is in UTC, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
+        embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
         embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
         all_fields = []
         prio_count = {v: 0 for v in self.num_to_prio.values()}
         for res in result:
             prio = self.num_to_prio[res['priority']]
             prio_count[prio] += 1
-            timestamp = res['added'].strftime(cfg.TIME_FORMAT)
+            timestamp = format_dt(res['added'], cfg.TIME_FORMAT, cfg.TIME_ZONE)
             tmp_val = f"Priority: {prio}\nAdded: {timestamp}\nExtra: {res['extra']}\n"
             if res['updated'] is not None:
-                tmp_val += f"Updated: {res['updated'].strftime(cfg.TIME_FORMAT)}\n"
+                tmp_val += f"Updated: {format_dt(res['updated'], cfg.TIME_FORMAT, cfg.TIME_ZONE)}\n"
             if res['done'] is not None:
-                tmp_val += f"Done: {res['done'].strftime(cfg.TIME_FORMAT)}\n"
+                tmp_val += f"Done: {format_dt(res['done'], cfg.TIME_FORMAT, cfg.TIME_ZONE)}\n"
             all_fields.append({'name': f"{res['id']}. {res['title']}",
                                'value': tmp_val})
         item_sum = "Item summary:\n"
@@ -364,15 +365,15 @@ class Todo(commands.Cog, name="Todo"):
     def todo_show_item(self, res: asyncpg.Record):
         """Returns an embed for `res` PSQL query"""
         prio = self.num_to_prio[res['priority']]
-        timestamp = res['added'].strftime(cfg.TIME_FORMAT)
+        timestamp = format_dt(res['added'], cfg.TIME_FORMAT, cfg.TIME_ZONE)
         tmp_val = f"Priority: {prio}\nAdded: {timestamp}\nExtra: {res['extra']}\n"
         if res['updated'] is not None:
-            tmp_val += f"Updated: {res['updated'].strftime(cfg.TIME_FORMAT)}\n"
+            tmp_val += f"Updated: {format_dt(res['updated'], cfg.TIME_FORMAT, cfg.TIME_ZONE)}\n"
         if res['done'] is not None:
-            tmp_val += f"Done: {res['done'].strftime(cfg.TIME_FORMAT)}\n"
+            tmp_val += f"Done: {format_dt(res['done'], cfg.TIME_FORMAT, cfg.TIME_ZONE)}\n"
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
-        embed.set_footer(text="Time is in UTC, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
+        embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
         embed.add_field(name=f"{res['id']}. {res['title']}",
                         value=tmp_val,
                         inline=False)

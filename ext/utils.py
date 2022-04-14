@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from typing import Sequence, Optional, List, Tuple, MappingView, Set, Union
+from zoneinfo import ZoneInfo
 
 import asyncpg
 import discord
@@ -14,6 +15,15 @@ from jellyfish import jaro_winkler_similarity
 re_url = re.compile(r'https?://\S+', re.IGNORECASE)
 re_img_url = re.compile(r'https?://\S+(\.png|\.jpg|\.jpeg)', re.IGNORECASE)
 re_id = re.compile(r'\d{18}')
+
+
+def format_dt(dt: datetime, fmt: str, tz: Optional[str] = None) -> str:
+    """Format a datetime object (non-aware assumes UTC), if tz is not provided system-time is used"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if not tz:
+        return dt.astimezone().strftime(fmt)
+    return dt.astimezone(ZoneInfo(tz)).strftime(fmt)
 
 
 @asynccontextmanager

@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 import dateparser
 from discord.ext import commands
 
+import config as cfg
 from cogs.psql_collector import Collector
 from ext.context import Context
 from ext.internal import Channel, Guild, Message, User
 from ext.parsers import parsers
-from ext.utils import human_timedelta_short, transparent_embed
+from ext.utils import human_timedelta_short, transparent_embed, format_dt
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -79,10 +80,10 @@ class Stalk(commands.Cog, name="Stalk"):
         time_format = '%H:%M:%S - %d.%m.%y'
         embed.title = f"Stalking {user.name}#{user.discriminator}\n"
         if ctx.parsed.absolute:
-            embed.set_footer(text="Time is in UTC, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
-            embed.description = f"User created: {user.created_at.strftime(time_format)}\n"
+            embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str(self.bot.user.avatar_url))
+            embed.description = f"User created: {format_dt(user.created_at, time_format, cfg.TIME_ZONE)}\n"
             if hasattr(user, 'joined_at'):
-                embed.description += f"Joined guild: {user.joined_at.strftime(time_format)}\n"
+                embed.description += f"Joined guild: {format_dt(user.joined_at, time_format, cfg.TIME_ZONE)}\n"
         else:
             embed.description = f"User created: {human_timedelta_short(user.created_at)}\n"
             if hasattr(user, 'joined_at'):
@@ -146,7 +147,7 @@ class Stalk(commands.Cog, name="Stalk"):
                     continue
                 if isinstance(v, datetime):
                     if ctx.parsed.absolute:
-                        ret_str += f'{ref[k].format(v.strftime(time_format))}\n'
+                        ret_str += f'{ref[k].format(format_dt(v, time_format, cfg.TIME_ZONE))}\n'
                     else:
                         ret_str += f'{ref[k].format(human_timedelta_short(v))}\n'
                 elif isinstance(v, str):
@@ -186,12 +187,11 @@ class Stalk(commands.Cog, name="Stalk"):
                 q += f'AND user_id=${len(q_args)} '
             title += f' by {user.display_name}'
         if ctx.parsed.since:
-            since: datetime = dateparser.parse(ctx.parsed.since)
+            since: datetime = dateparser.parse(ctx.parsed.since, settings={'TIMEZONE': cfg.TIME_ZONE, 'RETURN_AS_TIMEZONE_AWARE': True})
             if not since:
                 return await ctx.send('Cannot parse date/time')
             title += f' since {ctx.parsed.since} ago'
-            # Convert to UTC and make timezone naive again
-            q_args.append(since.astimezone(tz=timezone.utc).replace(tzinfo=None))
+            q_args.append(since)
             if 'WHERE' not in q:
                 q += f'WHERE time > ${len(q_args)} '
             else:

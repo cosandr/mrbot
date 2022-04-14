@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, List
 import discord
 from discord.ext import commands
 
-from config import TIME_FORMAT
+import config as cfg
 from ext import utils
 from ext.context import Context
 from ext.internal import Message, User, Guild
@@ -246,7 +246,7 @@ class PastaCog(commands.Cog, name="Pasta"):
         if p.guild:
             embed.add_field(name='Guild', value=p.guild.name if p.guild.name else str(p.guild.id), inline=True)
         if p.added:
-            embed.add_field(name='Added', value=p.added.strftime(TIME_FORMAT), inline=False)
+            embed.add_field(name='Added', value=utils.format_dt(p.added, cfg.TIME_FORMAT, cfg.TIME_ZONE), inline=False)
         return embed
 
     @staticmethod

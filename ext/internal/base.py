@@ -5,7 +5,8 @@ from typing import Tuple, Dict, Set
 import asyncpg
 import discord
 
-from config import TIME_FORMAT
+import config as cfg
+from ext.utils import format_dt
 
 
 class CommonMeta(metaclass=ABCMeta):
@@ -125,7 +126,7 @@ class Common(CommonMeta):
                 if func := getattr(v, "pretty_repr", None):
                     attrs.append(f'{" " * _level * 2}{name}:\n{func(_level+1)}')
                 elif isinstance(v, datetime):
-                    attrs.append(f'{" " * _level * 2}{name}: {v.strftime(TIME_FORMAT)}')
+                    attrs.append(f'{" " * _level * 2}{name}: {format_dt(v, cfg.TIME_FORMAT, cfg.TIME_ZONE)}')
                 else:
                     attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
         return "\n".join(attrs)

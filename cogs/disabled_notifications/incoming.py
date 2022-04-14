@@ -5,6 +5,7 @@ from datetime import datetime
 import discord
 
 import config as cfg
+from ext.utils import format_dt
 
 logger = logging.getLogger('discord.Notifications')
 TIME_FORMAT_NO_DATE = '%H:%M:%S'
@@ -32,11 +33,11 @@ class Incoming:
 
     @property
     def time_str(self):
-        return self.time.strftime(cfg.TIME_FORMAT)
+        return format_dt(self.time, cfg.TIME_FORMAT, cfg.TIME_ZONE)
 
     @property
     def time_str_no_date(self):
-        return self.time.strftime(TIME_FORMAT_NO_DATE)
+        return format_dt(self.time, TIME_FORMAT_NO_DATE, cfg.TIME_ZONE)
 
     def __eq__(self, other):
         if not isinstance(other, Incoming):

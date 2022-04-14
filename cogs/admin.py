@@ -7,7 +7,6 @@ import re
 import time
 import traceback
 from contextlib import redirect_stdout
-from datetime import timezone
 from io import StringIO
 from textwrap import indent
 from traceback import format_exc
@@ -23,7 +22,7 @@ from ext.context import Context
 from ext.internal import User
 from ext.parsers import parsers
 from ext.psql import debug_query
-from ext.utils import paginate
+from ext.utils import paginate, format_dt
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -523,7 +522,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             history = await ctx.channel.history(limit=msg_num+1, oldest_first=True).flatten()
             for msg in history:
                 msg_user_name = msg.author.display_name
-                msg_time = msg.created_at.replace(tzinfo=timezone.utc).astimezone(tz=None).strftime("%H:%M - %d/%m/%y")
+                msg_time = format_dt(msg.created_at, cfg.TIME_FORMAT, cfg.TIME_ZONE)
                 if len(msg.embeds) != 0:
                     embed.add_field(name=f"{msg_user_name} {msg_time}", value=msg.embeds[0].url, inline=False)
                 elif len(msg.attachments) != 0:
@@ -546,7 +545,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
                 if msg_num <= 0:
                     break
                 msg_user_name = msg.author.display_name
-                msg_time = msg.created_at.replace(tzinfo=timezone.utc).astimezone(tz=None).strftime("%H:%M - %d/%m/%y")
+                msg_time = format_dt(msg.created_at, cfg.TIME_FORMAT, cfg.TIME_ZONE)
                 if who.lower() in msg_user_name.lower():
                     msg_list.append(msg)
                     msg_num -= 1
