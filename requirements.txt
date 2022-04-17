@@ -1,5 +1,4 @@
-discord.py[voice]<2.0
-# git+https://github.com/Rapptz/discord.py@master#egg=discord.py[voice]
+git+https://github.com/Rapptz/discord.py@master#egg=discord.py[voice]
 jellyfish
 numpy
 Pillow
