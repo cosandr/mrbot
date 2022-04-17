@@ -18,7 +18,7 @@ class InternalTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.loop = asyncio.get_event_loop()
         cls.bot = TestBot(cls.loop)
-        cls.loop.run_until_complete(cls.bot.async_init())
+        cls.loop.run_until_complete(cls.bot.setup_hook())
         # Ensure all tables exist
         names = [
             Guild.psql_table_name, Channel.psql_table_name, User.psql_table_name,

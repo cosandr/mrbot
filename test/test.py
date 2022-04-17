@@ -210,13 +210,17 @@ class Test:
                     debug_query(q, [], e)
 
 
-if __name__ == '__main__':
-    # Must run with python -m test.test from root dir
+async def main():
     loop = asyncio.get_event_loop()
     bot = TestBot(loop)
     try:
-        loop.run_until_complete(bot.async_init(con_live=True))
+        await bot.setup_hook(con_live=True)
         test = Test(loop, bot)
-        loop.run_until_complete(test.run())
+        await test.run()
     finally:
-        loop.run_until_complete(bot.close())
+        await bot.close()
+
+
+if __name__ == '__main__':
+    # Must run with python -m test.test from root dir
+    asyncio.run(main())

@@ -33,7 +33,8 @@ class TestBot(MrBot):
         extra = ['test']
         if platform.system() == 'Windows':
             extra.append('windows')
-        self.config = loop.run_until_complete(BotConfig.from_psql(dsn=dsn, extra=extra))
+        self.config = None
+        self._config_coro = BotConfig.from_psql(dsn=dsn, extra=extra)
         self.pool_live: Optional[asyncpg.pool.Pool] = None
         self.pool: Optional[asyncpg.pool.Pool] = None
         self.pool_pub: Optional[asyncpg.pool.Pool] = None
@@ -68,7 +69,8 @@ class TestBot(MrBot):
         # noinspection PyTypeChecker
         raise discord.errors.NotFound(Response(), 'User not found')
 
-    async def async_init(self, con_live=False, con_pub=False):
+    async def setup_hook(self, con_live=False, con_pub=False):
+        self.config = await self._config_coro
         self.aio_sess = ClientSession()
         self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init, max_size=32)
         live_dsn = self.config.psql.live
