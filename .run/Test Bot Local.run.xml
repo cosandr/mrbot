@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Test Bot" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="Test Bot Local" type="PythonConfigurationType" factoryName="Python">
     <module name="mrbot" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
@@ -23,7 +23,7 @@
       </ENTRIES>
     </EXTENSION>
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/launcher.py" />
-    <option name="PARAMETERS" value="--command-prefix ' --log-file bot-test.log --debug --busy-file ./busy psql-config -f config/.dsn_test -e test" />
+    <option name="PARAMETERS" value="--command-prefix ' --log-file bot-test.log --debug --busy-file ./busy psql-config -f config/.dsn_test -e test -e local" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

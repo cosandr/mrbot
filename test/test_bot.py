@@ -33,6 +33,8 @@ class TestBot(MrBot):
         extra = ['test']
         if platform.system() == 'Windows':
             extra.append('windows')
+        elif platform.system() == 'Darwin':
+            extra.append('local')
         self.config = None
         self._config_coro = BotConfig.from_psql(dsn=dsn, extra=extra)
         self.pool_live: Optional[asyncpg.pool.Pool] = None
