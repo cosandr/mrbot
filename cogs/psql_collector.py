@@ -367,5 +367,5 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     # endregion
 
 
-def setup(bot):
-    bot.add_cog(Collector(bot))
+async def setup(bot):
+    await bot.add_cog(Collector(bot))

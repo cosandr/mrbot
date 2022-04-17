@@ -138,5 +138,5 @@ async def on_command_error(ctx: Context, error: commands.CommandError):
             ctx.bot.logger.error(f'Cannot send to exceptions channel: {e}')
 
 
-def setup(bot):
+async def setup(bot):
     bot.add_listener(on_command_error)

@@ -306,5 +306,5 @@ class Emojis(commands.Cog, name="Emojis"):
         return self.Emoji(name, file_name, self.url+file_name)
 
 
-def setup(bot):
-    bot.add_cog(Emojis(bot))
+async def setup(bot):
+    await bot.add_cog(Emojis(bot))

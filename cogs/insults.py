@@ -119,5 +119,5 @@ class Insults(commands.Cog, name="Insults"):
                                f'by {src.display_name}```\n{content}```'))
 
 
-def setup(bot):
-    bot.add_cog(Insults(bot))
+async def setup(bot):
+    await bot.add_cog(Insults(bot))

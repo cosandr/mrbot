@@ -381,5 +381,5 @@ class Shitpost(commands.Cog, name='Shitposting'):
         return f'Mr. Bot thinks this is a {tmp} shitpost.'
 
 
-def setup(bot):
-    bot.add_cog(Shitpost(bot))
+async def setup(bot):
+    await bot.add_cog(Shitpost(bot))

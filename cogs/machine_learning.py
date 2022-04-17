@@ -481,5 +481,5 @@ special setting meaning no restrictions. 40 generally is a good value.""",
         return int(cat_a), categories_backwards[cat_a]
 
 
-def setup(bot):
-    bot.add_cog(MachineLearning(bot))
+async def setup(bot):
+    await bot.add_cog(MachineLearning(bot))

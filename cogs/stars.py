@@ -197,5 +197,5 @@ class Stars(commands.Cog, name='Stars'):
         return False
 
 
-def setup(bot):
-    bot.add_cog(Stars(bot))
+async def setup(bot):
+    await bot.add_cog(Stars(bot))

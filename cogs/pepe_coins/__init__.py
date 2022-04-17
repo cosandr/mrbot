@@ -1,5 +1,5 @@
 from .cog import PepeCoins
 
 
-def setup(bot):
-    bot.add_cog(PepeCoins(bot))
+async def setup(bot):
+    await bot.add_cog(PepeCoins(bot))
