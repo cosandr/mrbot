@@ -71,7 +71,6 @@ class Misc(commands.Cog, name="Miscellaneous"):
         self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
-        self.bot.loop.create_task(self.async_init())
         self.dota2_heroes = None
         self.wolf_client = wolframalpha.Client(self.wolf_key)
 
@@ -86,7 +85,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         if not self.pub_dsn:
             raise MissingConfigError('Postgres DSN for public database not found')
 
-    async def async_init(self):
+    async def cog_load(self):
         await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables_web.keys())
         q = self.psql_all_tables_web.values()

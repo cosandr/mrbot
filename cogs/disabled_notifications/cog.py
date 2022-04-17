@@ -29,7 +29,6 @@ class Notifications(commands.Cog):
         self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
-        self.bot.loop.create_task(self.async_init())
         self.send_ch: Optional[discord.abc.Messageable] = None
         # Cache for incoming data
         self.inc_cache: Dict[str, List[Incoming]] = {}
@@ -40,17 +39,14 @@ class Notifications(commands.Cog):
         self.queue = asyncio.Queue()
         self.worker_task = self.bot.loop.create_task(self.inc_worker())
 
-    def cog_unload(self):
-        self.bot.cleanup_tasks.append(self.bot.loop.create_task(self.async_unload()))
-
-    async def async_init(self):
+    async def cog_load(self):
         await self.bot.sess_ready.wait()
         await self.bot.wait_until_ready()
         self.server = await asyncio.start_server(self.server_cb, LISTEN_HOST, LISTEN_PORT)
         self.logger.info('Server listening on %s:%d', LISTEN_HOST, LISTEN_PORT)
         self.send_ch = discord.utils.get(self.bot.users, id=self.bot.owner_id)
 
-    async def async_unload(self):
+    async def cog_unload(self):
         await self.queue.put(None)
         await self.worker_task
         self.server.close()

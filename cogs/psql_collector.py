@@ -73,11 +73,10 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self.re_key = re.compile(r'Key.*is not present in table \"(\w+)\"\.')
-        self.bot.loop.create_task(self.async_init())
         self._type_interval = timedelta(minutes=1)
         self._cache = Cache()
 
-    async def async_init(self):
+    async def cog_load(self):
         await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables.keys())
         q = self.psql_all_tables.values()
@@ -102,10 +101,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
     async def cog_check(self, ctx: Context):
         return await self.bot.is_owner(ctx.author)
 
-    def cog_unload(self):
-        self.bot.cleanup_tasks.append(self.bot.loop.create_task(self.async_unload()))
-
-    async def async_unload(self):
+    async def cog_unload(self):
         await self.bot.msg_queue.put(QueueItem(9, None))
         await self.queue_task
         async with self.lock:

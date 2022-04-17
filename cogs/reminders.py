@@ -47,15 +47,13 @@ class Reminders(commands.Cog, name="Reminders"):
 
     def __init__(self, bot):
         self.bot: MrBot = bot
-        # Check table
-        self.bot.loop.create_task(self.async_init())
         # --- Logger ---
         self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         self._sleep_task: Optional[asyncio.Task] = None
 
-    async def async_init(self):
+    async def cog_load(self):
         await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables.keys())
         q = self.psql_all_tables.values()

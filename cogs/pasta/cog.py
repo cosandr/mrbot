@@ -27,11 +27,9 @@ class PastaCog(commands.Cog, name="Pasta"):
         self.logger = logging.getLogger(f'{self.bot.logger.name}.{self.__class__.__name__}')
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
-        # Check required table
-        self.bot.loop.create_task(self.async_init())
         self.re_id = re.compile(r'\d{18}')
 
-    async def async_init(self):
+    async def cog_load(self):
         await self.bot.sess_ready.wait()
         names = itertools.chain(*Pasta.psql_all_tables.keys())
         q = Pasta.psql_all_tables.values()
