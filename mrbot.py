@@ -62,7 +62,7 @@ class MrBot(commands.Bot):
         self.logger.setLevel(logging.DEBUG)
         # --- Logger ---
         # --- Load stuff ---
-        self.connect_task: asyncio.Task = self.loop.create_task(self.connect_sess())
+        self.sess_ready = asyncio.Event()
         self._extension_override = kwargs.pop('extension_override', None)
         if platform.system() != 'Windows':
             self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
@@ -96,8 +96,9 @@ class MrBot(commands.Bot):
         self.unload_all_extensions()
         self.load_all_extensions()
 
-    async def connect_sess(self) -> None:
+    async def setup_hook(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
+        self.sess_ready.clear()
         self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init)
         # noinspection PyProtectedMember
         self.logger.info(f"Pool connected to database `{self.pool._working_params.database}`.")
@@ -106,6 +107,7 @@ class MrBot(commands.Bot):
         if self.config.brains.startswith('/'):
             self.logger.info("Unix session initialized.")
             self.unix_sess = ClientSession(connector=UnixConnector(path=self.config.brains))
+        self.sess_ready.set()
 
     async def on_ready(self) -> None:
         self.logger.info((f"Logged in as {self.user.name} [{self.user.id}], "

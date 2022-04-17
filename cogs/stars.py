@@ -41,7 +41,7 @@ class Stars(commands.Cog, name='Stars'):
         self.count_threshold = 2
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables.keys())
         q = self.psql_all_tables.values()
         async with self.bot.psql_lock:

@@ -44,7 +44,7 @@ class Notifications(commands.Cog):
         self.bot.cleanup_tasks.append(self.bot.loop.create_task(self.async_unload()))
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         await self.bot.wait_until_ready()
         self.server = await asyncio.start_server(self.server_cb, LISTEN_HOST, LISTEN_PORT)
         self.logger.info('Server listening on %s:%d', LISTEN_HOST, LISTEN_PORT)

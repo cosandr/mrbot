@@ -32,7 +32,7 @@ class PastaCog(commands.Cog, name="Pasta"):
         self.re_id = re.compile(r'\d{18}')
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         names = itertools.chain(*Pasta.psql_all_tables.keys())
         q = Pasta.psql_all_tables.values()
         async with self.bot.psql_lock:

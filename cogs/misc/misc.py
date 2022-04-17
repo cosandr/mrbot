@@ -87,7 +87,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
             raise MissingConfigError('Postgres DSN for public database not found')
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables_web.keys())
         q = self.psql_all_tables_web.values()
         async with pg_connection(dsn=self.web_dsn) as con:

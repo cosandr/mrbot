@@ -66,7 +66,7 @@ class Todo(commands.Cog, name="Todo"):
         self.prio_str = ', '.join(self.num_to_prio.values())
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables.keys())
         q = self.psql_all_tables.values()
         async with self.bot.psql_lock:

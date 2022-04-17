@@ -47,7 +47,7 @@ class Music(commands.Cog, name="YouTube Music"):
             raise MissingConfigError('Google API key not found')
 
     async def async_load(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         self.yt = YouTube(self.bot.aio_sess, self.api_key)
 
     def cog_unload(self):

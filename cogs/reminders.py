@@ -56,7 +56,7 @@ class Reminders(commands.Cog, name="Reminders"):
         self._sleep_task: Optional[asyncio.Task] = None
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables.keys())
         q = self.psql_all_tables.values()
         async with self.bot.psql_lock:

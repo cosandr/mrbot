@@ -39,7 +39,7 @@ class Insults(commands.Cog, name="Insults"):
         self.bot.loop.create_task(self.async_init())
 
     async def async_init(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         names = itertools.chain(*self.psql_all_tables.keys())
         q = self.psql_all_tables.values()
         async with self.bot.psql_lock:

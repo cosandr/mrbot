@@ -40,7 +40,7 @@ class InternalTests(unittest.TestCase):
             self.loop.run_until_complete(self._wait_connect())
 
     async def _wait_connect(self):
-        await self.bot.connect_task
+        await self.bot.sess_ready.wait()
         await self.bot.wait_until_ready()
 
     def test_message_from_user(self):
