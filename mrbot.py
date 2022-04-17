@@ -82,7 +82,6 @@ class MrBot(commands.Bot):
         self._busy_task = None
         if self.busy_file:
             self._busy_task = self.loop.create_task(self.busy_file_worker())
-        self.load_all_extensions()
 
     def run(self, *args, **kwargs):
         super().run(self.config.token, *args, **kwargs)
@@ -93,8 +92,10 @@ class MrBot(commands.Bot):
 
     def _handler_reload(self) -> None:
         """Reload cogs on SIGHUP"""
-        self.unload_all_extensions()
-        self.load_all_extensions()
+        async def __reload():
+            await self.unload_all_extensions()
+            await self.load_all_extensions()
+        self.loop.create_task(__reload())
 
     async def setup_hook(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
@@ -108,6 +109,7 @@ class MrBot(commands.Bot):
             self.logger.info("Unix session initialized.")
             self.unix_sess = ClientSession(connector=UnixConnector(path=self.config.brains))
         self.sess_ready.set()
+        await self.load_all_extensions()
 
     async def on_ready(self) -> None:
         self.logger.info((f"Logged in as {self.user.name} [{self.user.id}], "
@@ -121,7 +123,7 @@ class MrBot(commands.Bot):
         if self._busy_task:
             self._busy_task.cancel()
         self.logger.info('--- Unloading cogs')
-        self.unload_all_extensions()
+        await self.unload_all_extensions()
         for task in self.cleanup_tasks:
             if not task.done():
                 self.logger.info(f'------ Waiting for {task.get_coro()}')
@@ -212,7 +214,7 @@ class MrBot(commands.Bot):
         if err_str != "":
             await msg.channel.send(err_str)
 
-    def load_all_extensions(self, logger: logging.Logger = None) -> None:
+    async def load_all_extensions(self, logger: logging.Logger = None) -> None:
         """Load all bot cogs in `cogs` folder, ignores files starting with `disabled`."""
         loaded = []
         skipped = []
@@ -235,7 +237,7 @@ class MrBot(commands.Bot):
         ret_str = "\n"
         for ext_name in to_load:
             try:
-                self.load_extension(ext_name)
+                await self.load_extension(ext_name)
                 loaded.append(ext_name)
             except Exception as error:
                 if hasattr(error, 'original') and isinstance(error.original, MissingConfigError):
@@ -259,13 +261,13 @@ class MrBot(commands.Bot):
             logger = self.logger
         logger.info(ret_str.rstrip())
 
-    def unload_all_extensions(self) -> None:
+    async def unload_all_extensions(self) -> None:
         """Same as `load_all_extensions` except it unloads them."""
         # DO NOT REMOVE, avoids error below
         # RuntimeError: dictionary changed size during iteration
         for name in [k for k in self.extensions.keys()]:
             try:
-                self.unload_extension(name)
+                await self.unload_extension(name)
             except Exception:
                 self.logger.exception(f'Failed to unload {name}')
 

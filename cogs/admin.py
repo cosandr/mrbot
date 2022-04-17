@@ -567,27 +567,27 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
     async def reload(self, ctx: Context):
         self.logger.info('--- RELOAD START ---')
         self.logger.info(' -- Unloading cogs')
-        self.bot.unload_all_extensions()
+        await self.bot.unload_all_extensions()
         self.logger.info(' -- Waiting for cleanup tasks')
         for task in self.bot.cleanup_tasks:
             if not task.done():
                 self.logger.info(f' ---- Waiting for {task.get_coro()}')
             await task
         self.logger.info(' -- Loading cogs')
-        self.bot.load_all_extensions(logger=self.logger)
+        await self.bot.load_all_extensions(logger=self.logger)
         self.logger.info('--- RELOAD END ---')
         await ctx.send('Reloaded all cogs')
 
     @reload.command(name='cog')
     async def reload_cog(self, ctx: Context, cog_name: str):
         try:
-            self.bot.unload_extension(f'cogs.{cog_name}')
+            await self.bot.unload_extension(f'cogs.{cog_name}')
         except Exception as e:
             await ctx.send(f'Failed to unload {cog_name}: {str(e)}.')
             traceback.print_exc()
             return
         try:
-            self.bot.load_extension(f'cogs.{cog_name}')
+            await self.bot.load_extension(f'cogs.{cog_name}')
         except Exception as e:
             await ctx.send(f'Failed to load {cog_name}: {str(e)}.')
             traceback.print_exc()
