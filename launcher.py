@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import asyncio
 import os
 from typing import Optional
 
@@ -13,12 +14,12 @@ CONFIG: Optional[BotConfig] = None
 DSN_ENV = 'CONFIG_DSN'
 
 
-def json_config(args: argparse.Namespace):
+async def json_config(args: argparse.Namespace):
     global CONFIG
     CONFIG = BotConfig.from_json(configs=args.configs, guilds=args.guilds)
 
 
-def psql_config(args: argparse.Namespace):
+async def psql_config(args: argparse.Namespace):
     global CONFIG
     if args.dsn:
         dsn = args.dsn
@@ -30,8 +31,7 @@ def psql_config(args: argparse.Namespace):
     else:
         raise RuntimeError('No DSN')
 
-    import asyncio
-    CONFIG = asyncio.get_event_loop().run_until_complete(BotConfig.from_psql(dsn=dsn, extra=args.extra))
+    CONFIG = await BotConfig.from_psql(dsn=dsn, extra=args.extra)
 
 
 parser = argparse.ArgumentParser(description='MrBot launcher')
@@ -61,9 +61,9 @@ parser_psql.add_argument('-e', '--extra', action='append', default=[], help='Ext
 parser_psql.set_defaults(func=psql_config)
 
 
-if __name__ == '__main__':
+async def main():
     _args = parser.parse_args()
-    _args.func(_args)
+    await _args.func(_args)
     if not CONFIG:
         raise RuntimeError('No config loaded')
     bot = MrBot(
@@ -78,4 +78,9 @@ if __name__ == '__main__':
     )
     if _args.debug:
         bot.logger.debug('\n%s', CONFIG.safe_repr())
-    bot.run()
+    async with bot:
+        await bot.start()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -83,8 +83,8 @@ class MrBot(commands.Bot):
         if self.busy_file:
             self._busy_task = self.loop.create_task(self.busy_file_worker())
 
-    def run(self, *args, **kwargs):
-        super().run(self.config.token, *args, **kwargs)
+    async def start(self, *args, **kwargs):
+        await super().start(self.config.token, *args, **kwargs)
 
     def _handler_close(self) -> None:
         """Close gracefully on SIGTERM"""
