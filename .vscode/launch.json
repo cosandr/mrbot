@@ -2,11 +2,42 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Test",
+            "name": "Test Bot",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/test.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/launcher.py",
+            "console": "internalConsole",
+            "justMyCode": true,
+            "args": [
+                "--command-prefix", "'",
+                "--log-file", "bot-test.log",
+                "--debug",
+                "--busy-file", "./busy",
+                "psql-config", "-f", "config/.dsn_test", "-e", "test",
+            ]
+        },
+        {
+            "name": "Test Bot Local",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/launcher.py",
+            "console": "internalConsole",
+            "justMyCode": true,
+            "args": [
+                "--command-prefix", "'",
+                "--log-file", "bot-test.log",
+                "--debug",
+                "--busy-file", "./busy",
+                "psql-config", "-f", "config/.dsn_test", "-e", "test", "-e", "local"
+            ]
+        },
+        {
+            "name": "test.py",
+            "type": "python",
+            "request": "launch",
+            "module": "test.test",
+            "justMyCode": true,
+            "console": "internalConsole"
         }
     ]
 }
