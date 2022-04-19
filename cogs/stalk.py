@@ -12,7 +12,7 @@ from cogs.psql_collector import Collector
 from ext.context import Context
 from ext.internal import Channel, Guild, Message, User
 from ext.parsers import parsers
-from ext.utils import human_timedelta_short, transparent_embed, format_dt
+from ext.utils import human_timedelta_short, str_or_none, transparent_embed, format_dt
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -80,7 +80,7 @@ class Stalk(commands.Cog, name="Stalk"):
         time_format = '%H:%M:%S - %d.%m.%y'
         embed.title = f"Stalking {user.name}#{user.discriminator}\n"
         if ctx.parsed.absolute:
-            embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str(self.bot.user.avatar))
+            embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str_or_none(self.bot.user.avatar))
             embed.description = f"User created: {format_dt(user.created_at, time_format, cfg.TIME_ZONE)}\n"
             if hasattr(user, 'joined_at'):
                 embed.description += f"Joined guild: {format_dt(user.joined_at, time_format, cfg.TIME_ZONE)}\n"
@@ -88,7 +88,7 @@ class Stalk(commands.Cog, name="Stalk"):
             embed.description = f"User created: {human_timedelta_short(user.created_at)}\n"
             if hasattr(user, 'joined_at'):
                 embed.description += f"Joined guild: {human_timedelta_short(user.joined_at)}\n"
-        embed.set_thumbnail(url=str(user.avatar))
+        embed.set_thumbnail(url=str_or_none(user.avatar))
         result_dict = {'status': dict(activity=int_user.activity, mobile='Yes' if int_user.mobile else 'No')}
 
         async with self.bot.pool.acquire() as con:

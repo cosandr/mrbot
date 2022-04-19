@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 import config as cfg
-from ext.utils import get_url, re_id, find_similar_str, format_dt
+from ext.utils import get_url, re_id, find_similar_str, format_dt, str_or_none
 from .base import Common
 from .channel import Channel
 from .guild import Guild
@@ -219,7 +219,7 @@ class Message(Common):
         embed = discord.Embed()
         embed.set_footer(text=self.time_str)
         if self.author.avatar:
-            embed.set_author(name=self.author.display_name, icon_url=str(self.author.avatar))
+            embed.set_author(name=self.author.display_name, icon_url=str_or_none(self.author.avatar))
         else:
             embed.set_author(name=self.author.display_name)
         embed.description = self.content

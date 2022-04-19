@@ -14,7 +14,7 @@ from jellyfish import jaro_winkler_similarity
 import ext.embed_helpers as emh
 from ext.context import Context
 from ext.psql import create_table
-from ext.utils import fmt_timedelta, human_large_num
+from ext.utils import fmt_timedelta, human_large_num, str_or_none
 from . import utils as pu
 
 if TYPE_CHECKING:
@@ -529,8 +529,8 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     def pepecoins_embed_init(self, usr):
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
-        embed.set_author(name=usr.display_name, icon_url=str(usr.avatar))
-        embed.set_footer(icon_url=str(self.bot.user.avatar))
+        embed.set_author(name=usr.display_name, icon_url=str_or_none(usr.avatar))
+        embed.set_footer(icon_url=str_or_none(self.bot.user.avatar))
         return embed
 
     async def add_new_player(self, con, player, stats=None, units=None):

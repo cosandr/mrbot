@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
-from typing import Sequence, Optional, List, Tuple, MappingView, Set, Union
+from typing import Sequence, Optional, List, Tuple, MappingView, Set, Union, Any
 from zoneinfo import ZoneInfo
 
 import asyncpg
@@ -15,6 +15,13 @@ from jellyfish import jaro_winkler_similarity
 re_url = re.compile(r'https?://\S+', re.IGNORECASE)
 re_img_url = re.compile(r'https?://\S+(\.png|\.jpg|\.jpeg)', re.IGNORECASE)
 re_id = re.compile(r'\d{18}')
+
+
+def str_or_none(val: Optional[Any]) -> Optional[str]:
+    """Cast val to string, keeping None."""
+    if val is None:
+        return None
+    return str(val)
 
 
 def format_dt(dt: datetime, fmt: str, tz: Optional[str] = None) -> str:

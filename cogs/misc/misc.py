@@ -32,7 +32,7 @@ from ext.errors import MissingConfigError
 from ext.internal import Message, User
 from ext.parsers import parsers
 from ext.psql import create_table
-from ext.utils import pg_connection
+from ext.utils import pg_connection, str_or_none
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -650,7 +650,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
         embed.colour = discord.Colour.green()
         embed.set_author(name=hero['localized_name'])
         embed.set_thumbnail(url=hero_icon)
-        embed.set_footer(text=ctx.author.display_name, icon_url=str(ctx.author.avatar))
+        embed.set_footer(text=ctx.author.display_name, icon_url=str_or_none(ctx.author.avatar))
         embed.add_field(name="Primary Attribute", value=attr_names[hero['primary_attr']], inline=False)
         embed.add_field(name="Attack Type", value=hero['attack_type'], inline=False)
         embed.add_field(name="Roles", value=", ".join(hero['roles']), inline=False)

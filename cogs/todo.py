@@ -15,7 +15,7 @@ from ext.internal import User
 from ext.parsers import parsers
 from ext.parsers.errors import ArgParseError
 from ext.psql import create_table, ensure_foreign_key, debug_query
-from ext.utils import format_dt
+from ext.utils import format_dt, str_or_none
 
 if TYPE_CHECKING:
     from mrbot import MrBot
@@ -87,8 +87,8 @@ class Todo(commands.Cog, name="Todo"):
             return await ctx.send(f"{ctx.author.display_name} doesn't have any entries in their todo list.")
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
-        embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str(self.bot.user.avatar))
-        embed.set_author(name=ctx.author.display_name, icon_url=str(ctx.author.avatar))
+        embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str_or_none(self.bot.user.avatar))
+        embed.set_author(name=ctx.author.display_name, icon_url=str_or_none(ctx.author.avatar))
         all_fields = []
         prio_count = {v: 0 for v in self.num_to_prio.values()}
         for res in result:
@@ -191,7 +191,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE user_id=$1 ORDER BY added DESC LIMIT 1"
             res = await con.fetchrow(q, ctx.author.id)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Add", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Todo Item Add", icon_url=str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -239,7 +239,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Edit", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Todo Item Edit", icon_url=str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -259,7 +259,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Done", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Todo Item Done", icon_url=str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -279,7 +279,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Undo", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Todo Item Undo", icon_url=str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -299,7 +299,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"DELETE FROM {self.psql_table_name} WHERE id=$1"
             await con.execute(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Deleted", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Todo Item Deleted", icon_url=str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -316,7 +316,7 @@ class Todo(commands.Cog, name="Todo"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
             res = await con.fetchrow(q, ctx.parsed.index)
         embed = self.todo_show_item(res)
-        embed.set_author(name="Todo Item Show", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Todo Item Show", icon_url=str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @todo.command(
@@ -371,7 +371,7 @@ class Todo(commands.Cog, name="Todo"):
             tmp_val += f"Done: {format_dt(res['done'], cfg.TIME_FORMAT, cfg.TIME_ZONE)}\n"
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
-        embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str(self.bot.user.avatar))
+        embed.set_footer(text=f"Timezone is {cfg.TIME_ZONE}, date format dd.mm.yy", icon_url=str_or_none(self.bot.user.avatar))
         embed.add_field(name=f"{res['id']}. {res['title']}",
                         value=tmp_val,
                         inline=False)

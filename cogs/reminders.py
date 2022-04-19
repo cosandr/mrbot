@@ -104,7 +104,7 @@ class Reminders(commands.Cog, name="Reminders"):
             q = f"SELECT * FROM {self.psql_table_name} WHERE owner_id=$1 AND notify_ts=$2 ORDER BY added DESC LIMIT 1"
             res = await con.fetchrow(q, ctx.author.id, parsed_ts)
         embed = await self.reminder_show_item(res, ctx)
-        embed.set_author(name="Reminder Item Add", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Reminder Item Add", icon_url=utils.str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @reminder.command(
@@ -216,7 +216,7 @@ class Reminders(commands.Cog, name="Reminders"):
             res = await con.fetchrow(q, ctx.parsed.index)
         await self.refresh_worker()
         embed = await self.reminder_show_item(res, ctx)
-        embed.set_author(name="Reminder Edited", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Reminder Edited", icon_url=utils.str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @reminder.command(
@@ -236,7 +236,7 @@ class Reminders(commands.Cog, name="Reminders"):
             await con.execute(q, ctx.parsed.index)
         await self.refresh_worker()
         embed = await self.reminder_show_item(res, ctx)
-        embed.set_author(name="Reminder Deleted", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Reminder Deleted", icon_url=utils.str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     @reminder.command(
@@ -252,7 +252,7 @@ class Reminders(commands.Cog, name="Reminders"):
             return
 
         embed = await self.reminder_show_item(res, ctx)
-        embed.set_author(name="Reminder Show", icon_url=str(ctx.author.avatar))
+        embed.set_author(name="Reminder Show", icon_url=utils.str_or_none(ctx.author.avatar))
         return await ctx.send(embed=embed)
 
     async def reminder_show_item(self, res: asyncpg.Record, ctx: Context = None, firing=False):
@@ -276,7 +276,7 @@ class Reminders(commands.Cog, name="Reminders"):
         embed.colour = discord.Colour.dark_blue()
         embed.set_footer(
             text=f"{cfg.TIME_ZONE}; dd.mm.yy",
-            icon_url=str(self.bot.user.avatar),
+            icon_url=utils.str_or_none(self.bot.user.avatar),
         )
         if res['failed']:
             tmp_name = "❌ "
