@@ -30,9 +30,8 @@ class MakeMeme(commands.Cog, name="Make Meme"):
         self.bot: MrBot = bot
         self._re_entry = re.compile(r'\s*-entry\s+', re.IGNORECASE)
         self._templates = None
-        self.bot.loop.create_task(self.cog_load_async())
 
-    async def cog_load_async(self):
+    async def cog_load(self):
         self._templates = await self.bot.loop.run_in_executor(None, lambda: AllMemeTemplates())
 
     @parsers.group(

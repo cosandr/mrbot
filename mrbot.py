@@ -64,9 +64,6 @@ class MrBot(commands.Bot):
         # --- Load stuff ---
         self.sess_ready = asyncio.Event()
         self._extension_override = kwargs.pop('extension_override', None)
-        if platform.system() != 'Windows':
-            self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
-            self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
         # Queue for message logger
         self.msg_queue = asyncio.PriorityQueue()
         self.psql_lock = asyncio.Lock()
@@ -80,25 +77,31 @@ class MrBot(commands.Bot):
         self._running_commands = 0
         self._busy_wake = asyncio.Event()
         self._busy_task = None
-        if self.busy_file:
-            self._busy_task = self.loop.create_task(self.busy_file_worker())
 
     async def start(self, *args, **kwargs):
         await super().start(self.config.token, *args, **kwargs)
 
     def _handler_close(self) -> None:
         """Close gracefully on SIGTERM"""
-        self.loop.create_task(self.close())
+        asyncio.create_task(self.close())
 
     def _handler_reload(self) -> None:
         """Reload cogs on SIGHUP"""
         async def __reload():
             await self.unload_all_extensions()
             await self.load_all_extensions()
-        self.loop.create_task(__reload())
+        asyncio.create_task(__reload())
 
     async def setup_hook(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
+        # Can only access bot.loop in async context 
+        if platform.system() != 'Windows':
+            self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
+            self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
+
+        if self.busy_file:
+            self._busy_task = asyncio.create_task(self.busy_file_worker())
+
         self.sess_ready.clear()
         self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init)
         # noinspection PyProtectedMember
@@ -109,7 +112,8 @@ class MrBot(commands.Bot):
             self.logger.info("Unix session initialized.")
             self.unix_sess = ClientSession(connector=UnixConnector(path=self.config.brains))
         self.sess_ready.set()
-        await self.load_all_extensions()
+        # Run as task to avoid deadlock
+        asyncio.create_task(self.load_all_extensions())
 
     async def on_ready(self) -> None:
         self.logger.info((f"Logged in as {self.user.name} [{self.user.id}], "
@@ -219,6 +223,8 @@ class MrBot(commands.Bot):
         loaded = []
         skipped = []
         failed = []
+        if logger is None:
+            logger = self.logger
         if self._extension_override is not None:
             to_load = self._extension_override
         else:
@@ -237,9 +243,12 @@ class MrBot(commands.Bot):
         ret_str = "\n"
         for ext_name in to_load:
             try:
+                logger.debug("Loading: %s", ext_name)
                 await self.load_extension(ext_name)
+                logger.debug("Loaded: %s", ext_name)
                 loaded.append(ext_name)
             except Exception as error:
+                logger.debug("Load failed: %s", ext_name)
                 if hasattr(error, 'original') and isinstance(error.original, MissingConfigError):
                     err_msg += f'{error}\n'
                 else:
@@ -257,8 +266,6 @@ class MrBot(commands.Bot):
             for cog in failed:
                 ret_str += f"!! {cog}\n"
             ret_str += err_msg
-        if logger is None:
-            logger = self.logger
         logger.info(ret_str.rstrip())
 
     async def unload_all_extensions(self) -> None:
@@ -267,9 +274,11 @@ class MrBot(commands.Bot):
         # RuntimeError: dictionary changed size during iteration
         for name in [k for k in self.extensions.keys()]:
             try:
+                self.logger.debug("Unloading: %s", name)
                 await self.unload_extension(name)
+                self.logger.debug("Unloaded: %s", name)
             except Exception:
-                self.logger.exception(f'Failed to unload {name}')
+                self.logger.exception("Failed to unload: %s", name)
 
     async def brains_post_request(self, url: str, **kwargs) -> Response:
         """Return Response from brains API POST request, url should include slash"""

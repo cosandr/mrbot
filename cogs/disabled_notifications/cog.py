@@ -37,7 +37,7 @@ class Notifications(commands.Cog):
         # Resets timeout timer
         self.reset_timer = False
         self.queue = asyncio.Queue()
-        self.worker_task = self.bot.loop.create_task(self.inc_worker())
+        self.worker_task = asyncio.create_task(self.inc_worker())
 
     async def cog_load(self):
         await self.bot.sess_ready.wait()

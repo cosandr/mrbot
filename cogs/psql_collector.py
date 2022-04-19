@@ -65,7 +65,7 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
 
     def __init__(self, bot):
         self.bot: MrBot = bot
-        self.queue_task = self.bot.loop.create_task(self.run_queue())
+        self.queue_task = asyncio.create_task(self.run_queue())
         self.con: Optional[asyncpg.Connection] = None
         self.lock: asyncio.Lock = asyncio.Lock()
         # --- Logger ---

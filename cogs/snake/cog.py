@@ -59,7 +59,7 @@ class SnakeCog(commands.Cog, name="Snake"):
             return (r.message.id == self.game_msg.id and str(r.emoji) in moves and
                     u != self.bot.user)
 
-        tmp_task = self.bot.loop.create_task(move_task())
+        tmp_task = asyncio.create_task(move_task())
         while True:
             try:
                 reaction, user = await self.bot.wait_for('reaction_add', timeout=10.0, check=check)

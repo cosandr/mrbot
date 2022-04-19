@@ -376,7 +376,7 @@ class Reminders(commands.Cog, name="Reminders"):
             self.logger.debug("No remaining reminders")
             return
         self.logger.debug("Starting sleep task for reminder %d", res['id'])
-        self._sleep_task = self.bot.loop.create_task(self.sleep_worker(res))
+        self._sleep_task = asyncio.create_task(self.sleep_worker(res))
 
     async def fire_reminder(self, res: asyncpg.Record):
         try:
@@ -418,12 +418,12 @@ class Reminders(commands.Cog, name="Reminders"):
             start = datetime.now(timezone.utc)
             if start >= r['notify_ts']:
                 self.logger.debug("Reminder %d overdue [%s]", r['id'], utils.human_timedelta_short(r['notify_ts']))
-                self.bot.loop.create_task(self.fire_reminder(r))
+                asyncio.create_task(self.fire_reminder(r))
                 return
             duration = abs((start - r['notify_ts']).total_seconds())
             self.logger.debug("Reminder %d due in %s [%d seconds]", r['id'], utils.human_seconds(duration), duration)
             await asyncio.sleep(duration)
-            self.bot.loop.create_task(self.fire_reminder(r))
+            asyncio.create_task(self.fire_reminder(r))
         except asyncio.CancelledError:
             return
 

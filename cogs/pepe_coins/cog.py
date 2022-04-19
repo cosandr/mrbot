@@ -112,7 +112,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     @commands.command(brief="Real time display of game stats")
     async def prodinfo(self, ctx: Context):
         msg = await ctx.send(f"Coin production display for {ctx.author.display_name}")
-        self.bot.loop.create_task(self.game_task(ctx.author.id, msg))
+        asyncio.create_task(self.game_task(ctx.author.id, msg))
 
     @commands.command(brief='Display game stats')
     async def gamestats(self, ctx: Context):
@@ -260,7 +260,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
             self.bet_players[ctx.guild.id] = f"{ctx.author.display_name} bet {human_large_num(bet_coins)}."
             embed.add_field(name=f"Joined players", value=self.bet_players[ctx.guild.id], inline=False)
             msg = await ctx.send(embed=embed)
-            self.bot.loop.create_task(self.bet_task(ctx.guild.id, embed, msg))
+            asyncio.create_task(self.bet_task(ctx.guild.id, embed, msg))
             return
 
         bet_max = self.gamble_calc(ctx.guild.id, 'bet', max)

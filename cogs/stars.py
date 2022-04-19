@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import itertools
 import logging
 from typing import TYPE_CHECKING
@@ -106,7 +107,7 @@ class Stars(commands.Cog, name='Stars'):
         await self._increment_stars(payload.message_id, 1)
         count = await self.bot.pool.fetchval(f'SELECT count FROM {self.psql_table_name} WHERE msg_id=$1', payload.message_id)
         if count and count >= self.count_threshold:
-            self.bot.loop.create_task(self._post_starred(payload.message_id, payload.channel_id, payload.guild_id))
+            asyncio.create_task(self._post_starred(payload.message_id, payload.channel_id, payload.guild_id))
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
@@ -126,7 +127,7 @@ class Stars(commands.Cog, name='Stars'):
             return
         # We're at 0, remove from table and starred channel if applicable
         if count <= 0:
-            self.bot.loop.create_task(self._remove_starred(payload.message_id, payload.guild_id))
+            asyncio.create_task(self._remove_starred(payload.message_id, payload.guild_id))
         else:
             await self.run_query(f'UPDATE {self.psql_table_name} SET count=$2 WHERE msg_id=$1', (payload.message_id, count))
 

@@ -39,19 +39,18 @@ class Music(commands.Cog, name="YouTube Music"):
         self.no_autoplay = asyncio.Event()
         self.alexa_running = asyncio.Event()
         self.re_yt = re.compile(r'(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.\S+')
-        self.bot.loop.create_task(self.async_load())
 
     def read_config(self):
         self.api_key = self.bot.config.api_keys.get('google')
         if not self.api_key:
             raise MissingConfigError('Google API key not found')
 
-    async def async_load(self):
+    async def cog_load(self):
         await self.bot.sess_ready.wait()
         self.yt = YouTube(self.bot.aio_sess, self.api_key)
 
-    def cog_unload(self):
-        self.bot.cleanup_tasks.append(self.bot.loop.create_task(self._dc()))
+    async def cog_unload(self):
+        await self._dc()
 
     @commands.group(brief='Play direct YT link or search for song name', invoke_without_command=True)
     @connect_voice_check()
