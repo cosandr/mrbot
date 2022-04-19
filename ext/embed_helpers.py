@@ -15,8 +15,8 @@ def embed_init(bot: commands.Bot, name: str) -> discord.Embed:
     """
     embed = discord.Embed()
     embed.colour = discord.Colour.dark_blue()
-    embed.set_author(name=name, icon_url=str(bot.get_user(bot.owner_id).avatar_url))
-    embed.set_footer(icon_url=str(bot.user.avatar_url))
+    embed.set_author(name=name, icon_url=str(bot.get_user(bot.owner_id).avatar))
+    embed.set_footer(icon_url=str(bot.user.avatar))
     return embed
 
 

@@ -80,7 +80,7 @@ async def on_command_error(ctx: Context, error: commands.CommandError):
     elif isinstance(error, commands.MissingRequiredArgument):
         embed = discord.Embed()
         embed.colour = discord.Colour.red()
-        embed.set_footer(text=ctx.author.display_name, icon_url=str(ctx.author.avatar_url))
+        embed.set_footer(text=ctx.author.display_name, icon_url=str(ctx.author.avatar))
         embed.title = "Command Error"
         embed.description = f"{cmd_name} is missing arguments."
         embed.add_field(name=error.param.name, value=f"Type: {error.param.annotation.__name__}", inline=False)

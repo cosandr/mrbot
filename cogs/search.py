@@ -60,7 +60,7 @@ class Search(commands.Cog, name="Search"):
                 val += example['text'] + "\n"
             embed.add_field(name="Examples", value=val, inline=False)
         embed.set_footer(text=f"Query in {(time.perf_counter()-start)*1000:.0f}ms",
-                         icon_url=str(self.bot.user.avatar_url))
+                         icon_url=str(self.bot.user.avatar))
         return await ctx.send(embed=embed)
 
     @commands.command(name='wiki', brief='Wikipedia search')
@@ -103,7 +103,7 @@ class Search(commands.Cog, name="Search"):
             img_url = tmp["imageinfo"][0]['url']
             embed.set_image(url=img_url)
 
-        embed.set_footer(text=f"Query in {(time.perf_counter()-start)*1000:.0f}ms", icon_url=str(self.bot.user.avatar_url))
+        embed.set_footer(text=f"Query in {(time.perf_counter()-start)*1000:.0f}ms", icon_url=str(self.bot.user.avatar))
         return await ctx.send(embed=embed)
 
 

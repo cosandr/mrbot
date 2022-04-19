@@ -17,7 +17,7 @@ class Context(commands.Context):
         owner_called = await self.bot.is_owner(self.author)
         embed = discord.Embed()
         embed.colour = discord.Colour.red()
-        embed.set_author(name=f"{self.command.name} cannot be called directly", icon_url=str(self.bot.get_user(self.bot.owner_id).avatar_url))
+        embed.set_author(name=f"{self.command.name} cannot be called directly", icon_url=str(self.bot.get_user(self.bot.owner_id).avatar))
         embed.title = "Available subcommands:"
         for subcmd in self.command.commands:
             if not owner_called and subcmd.hidden:

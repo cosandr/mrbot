@@ -52,7 +52,7 @@ class User(Common):
                              psql_table_name_status): psql_table})
 
     __slots__ = Common.__slots__ + \
-        ('id', 'name', '_discriminator', 'avatar', 'all_nicks', 'activity', 'activity_time',
+        ('id', 'name', '_discriminator', 'avatar_key', 'all_nicks', 'activity', 'activity_time',
          'online', 'mobile', 'status_time')
 
     def __init__(self,
@@ -64,7 +64,7 @@ class User(Common):
         self.id: int = id_
         self.name: str = name
         self.discriminator: int = discriminator
-        self.avatar: str = avatar
+        self.avatar_key: str = avatar
         # Nicks
         self.all_nicks: Dict[int, str] = {}
         if all_nicks and isinstance(all_nicks, dict):
@@ -102,15 +102,15 @@ class User(Common):
             self._discriminator = None
 
     @property
-    def avatar_url(self):
-        if not self.avatar:
+    def avatar(self):
+        if not self.avatar_key:
             if not self.discriminator:
                 return None
             return f'https://cdn.discordapp.com/embed/avatars/{self.discriminator % 5}.png?size=256'
         img_fmt = 'png'
-        if self.avatar.startswith('a_'):
+        if self.avatar_key.startswith('a_'):
             img_fmt = 'gif'
-        return f'https://cdn.discordapp.com/avatars/{self.id}/{self.avatar}.{img_fmt}?size=512'
+        return f'https://cdn.discordapp.com/avatars/{self.id}/{self.avatar_key}.{img_fmt}?size=512'
 
     @property
     def display_name(self):
@@ -174,7 +174,7 @@ class User(Common):
         q = (f'INSERT INTO {self.psql_table_name} '
              '(id, name, discriminator, avatar) VALUES ($1, $2, $3, $4) '
              'ON CONFLICT (id) DO UPDATE SET name=$2, discriminator=$3, avatar=$4')
-        q_args = [self.id, self.name, self.discriminator, self.avatar]
+        q_args = [self.id, self.name, self.discriminator, self.avatar_key]
         return q, q_args
 
     def to_psql_nick(self, guild_id: int) -> Tuple[str, list]:
@@ -378,6 +378,9 @@ class User(Common):
         activity = None
         online = None
         mobile = False
+        avatar = None
+        if user.avatar:
+            avatar = user.avatar.key
         if isinstance(user, discord.Member):
             all_nicks[user.guild.id] = user.nick
             mobile = user.is_on_mobile()
@@ -388,7 +391,7 @@ class User(Common):
             id_=user.id,
             name=user.name,
             discriminator=int(user.discriminator),
-            avatar=user.avatar,
+            avatar=avatar,
             all_nicks=all_nicks,
             activity=activity,
             online=online,

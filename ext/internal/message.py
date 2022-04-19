@@ -218,8 +218,8 @@ class Message(Common):
         """Embed from this message"""
         embed = discord.Embed()
         embed.set_footer(text=self.time_str)
-        if self.author.avatar_url:
-            embed.set_author(name=self.author.display_name, icon_url=self.author.avatar_url)
+        if self.author.avatar:
+            embed.set_author(name=self.author.display_name, icon_url=str(self.author.avatar))
         else:
             embed.set_author(name=self.author.display_name)
         embed.description = self.content

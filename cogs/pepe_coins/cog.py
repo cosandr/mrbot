@@ -529,8 +529,8 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
     def pepecoins_embed_init(self, usr):
         embed = discord.Embed()
         embed.colour = discord.Colour.dark_blue()
-        embed.set_author(name=usr.display_name, icon_url=usr.avatar_url)
-        embed.set_footer(icon_url=str(self.bot.user.avatar_url))
+        embed.set_author(name=usr.display_name, icon_url=str(usr.avatar))
+        embed.set_footer(icon_url=str(self.bot.user.avatar))
         return embed
 
     async def add_new_player(self, con, player, stats=None, units=None):
