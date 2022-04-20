@@ -279,10 +279,10 @@ class Emojis(commands.Cog, name="Emojis"):
                 return self.Emoji(clean, file, self.url+file)
         return None
 
-    async def download_emoji(self, em: discord.Emoji) -> BytesIO:
+    async def download_emoji(self, em: discord.Emoji) -> Optional[BytesIO]:
         """Resizes a discord Emoji and returns its on-disk URL"""
         buf = BytesIO()
-        saved_bytes = await em.url.save(buf)
+        saved_bytes = await em.save(buf)
         if saved_bytes == 0:
             return None
         return buf
