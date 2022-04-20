@@ -444,7 +444,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             # Check if it is simply number of messages
             if len(args) == 1:
                 try:
-                    del_list = await ctx.channel.history(limit=int(args[0])).flatten()
+                    del_list = [m async for m in ctx.channel.history(limit=int(args[0]))]
                 except ValueError:
                     return await ctx.send("Not a number.")
             elif len(args) == 2:
@@ -461,8 +461,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
                         break
                 if found is False:
                     return await ctx.send(f"{who} not found.")
-                history = await ctx.channel.history(limit=50).flatten()
-                for msg in history:
+                async for msg in ctx.channel.history(limit=50):
                     if num_msg <= 0:
                         break
                     if who.lower() in msg.author.display_name.lower():
@@ -519,7 +518,7 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
             return await ctx.send('Number of messages to be moved must be larger than 0.')
         embed = emh.embed_init(self.bot, "Move Messages")
         if who == 'any':
-            history = await ctx.channel.history(limit=msg_num+1, oldest_first=True).flatten()
+            history = [m async for m in ctx.channel.history(limit=msg_num+1, oldest_first=True)]
             for msg in history:
                 msg_user_name = msg.author.display_name
                 msg_time = format_dt(msg.created_at, cfg.TIME_FORMAT, cfg.TIME_ZONE)
@@ -539,9 +538,8 @@ class Admin(commands.Cog, name="Admin", command_attrs={'hidden': True}):
                     break
             if found is False:
                 return await ctx.send(f"{who} not found.")
-            history = await ctx.channel.history(limit=50).flatten()
             msg_list = []
-            for msg in history:
+            async for msg in ctx.channel.history(limit=50):
                 if msg_num <= 0:
                     break
                 msg_user_name = msg.author.display_name
