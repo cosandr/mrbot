@@ -46,7 +46,8 @@ async def on_command_error(ctx: Context, error: commands.CommandError):
                 for check in check_similar_to:
                     # Include main command name in suggestions
                     for m in find_similar_str(check, group_check):
-                        meant.add(f'{cmd.name} {m}')
+                        if hasattr(cmd, 'name'):
+                            meant.add(f'{cmd.name} {m}')
         # Check regular commands
         for check in check_similar_to:
             for m in find_similar_str(check, check_against):
@@ -99,10 +100,10 @@ async def on_command_error(ctx: Context, error: commands.CommandError):
         return await ctx.send(f"``{cmd_name}`` is an owner only command.")
 
     elif isinstance(error, commands.errors.MissingPermissions):
-        return await ctx.send(f'You are missing permissions: {", ".join(error.missing_perms)}.')
+        return await ctx.send(f'You are missing permissions: {", ".join(error.missing_permissions)}.')
 
     elif isinstance(error, commands.errors.BotMissingPermissions):
-        return await ctx.send(f'The bot is missing permissions: {", ".join(error.missing_perms)}.')
+        return await ctx.send(f'The bot is missing permissions: {", ".join(error.missing_permissions)}.')
 
     elif isinstance(error, commands.errors.CheckFailure):
         ctx.bot.logger.info(f'{type(error)}: {error}')

@@ -589,7 +589,7 @@ class Misc(commands.Cog, name="Miscellaneous"):
             except discord.errors.NotFound:
                 return await ctx.send(f"No message with ID {msg_id} found.")
         else:
-            msg = await ctx.history(limit=2, before=ctx.message).get()
+            msg = await discord.utils.get(ctx.history(limit=2, before=ctx.message))
         await ctx.message.delete()
         await self.bot.add_reaction_str(msg, text)
 

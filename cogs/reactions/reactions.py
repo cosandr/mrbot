@@ -265,7 +265,7 @@ class Reactions(commands.Cog, name="Reaction"):
         try:
             await reaction.message.add_reaction(reaction.emoji)
         except Exception as e:
-            if reaction.custom_emoji:
+            if reaction.is_custom_emoji():
                 self.logger.warning(f"Failed to add custom emoji {reaction.emoji}: {e}")
             else:
                 self.logger.warning(f"Failed to add Unicode emoji {ord(reaction.emoji):x}: {e}")
