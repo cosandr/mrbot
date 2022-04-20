@@ -179,8 +179,19 @@ class Collector(commands.Cog, name="PSQL Collector", command_attrs={'hidden': Tr
         await self.bot.msg_queue.put(QueueItem(5, self.run_query(q, q_args, user=int_user, channel=int_ch, guild=int_guild)))
 
     @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
-        """Update user_status"""
+    async def on_member_update(self, _before: discord.Member, after: discord.Member):
+        """Update user profile"""
+        # Ignore webhooks
+        if after.discriminator == '0000':
+            return
+        if self.queue_task.done():
+            return
+        user = User.from_discord(after)
+        await self.check_and_update(user=user)
+
+    @commands.Cog.listener()
+    async def on_presence_update(self, before: discord.Member, after: discord.Member):
+        """Update user presence"""
         # Ignore webhooks
         if after.discriminator == '0000':
             return
