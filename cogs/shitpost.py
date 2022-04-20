@@ -57,7 +57,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         else:
             img = PIL.Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
             embed.set_footer(text=f"ASCII'ing {res.author.display_name}'s image.", icon_url=embed.footer.icon_url)
-            await msg.edit(embed=embed)
+            msg = await msg.edit(embed=embed)
         # Prevent large images for anyone except owner.
         if ((char_x > 500) or (char_x < 10)) and (ctx.author.id != self.bot.owner_id):
             char_x = 150

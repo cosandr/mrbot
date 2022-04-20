@@ -169,7 +169,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
             embed.set_field_at(0, name="Joined players", value=players_str)
             embed.title = 'Game starting'
             embed.description = ''
-            await msg.edit(embed=embed)
+            msg = await msg.edit(embed=embed)
             await asyncio.sleep(3)
             embed.clear_fields()
             embed.title = 'Rolling'
@@ -178,7 +178,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
             p_two_roll = random.randint(1, p_one_roll)
             embed.description += f"{p_one['name']} rolled: {p_one_roll:,}, " + \
                                  f"{p_two['name']} rolled: {p_two_roll:,}\n"
-            await msg.edit(embed=embed)
+            msg = await msg.edit(embed=embed)
             while True:
                 p_one_roll = random.randint(1, p_two_roll)
                 if p_one_roll == 1:
@@ -189,7 +189,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
                 await asyncio.sleep(1)
                 embed.description += f"{p_one['name']} rolled: {p_one_roll:,}, " + \
                                      f"{p_two['name']} rolled: {p_two_roll:,}\n"
-                await msg.edit(embed=embed)
+                msg = await msg.edit(embed=embed)
             embed.title = 'Game results'
             # OP wins
             if p_two_roll == 1:
@@ -200,7 +200,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
                 embed.description += f"{p_one['name']} won {human_large_num(roll_lim)} coins by rolling {p_one_roll}, " + \
                                      f"balance {human_large_num(p_one['coins'])}.\n{p_two['name']} " + \
                                      f"lost {human_large_num(roll_lim)} coins by rolling {p_two_roll}, balance {human_large_num(p_two['coins'])}.\n"
-                await msg.edit(embed=embed)
+                msg = await msg.edit(embed=embed)
                 return
             # Joined player wins
             await self.con.execute(self.rem_coins, roll_lim, p_one['id'])
@@ -393,7 +393,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
         for i in range(self.bet_wait, 0, -1):
             embed.set_field_at(0, name="Countdown", value=f"Seconds remaining: {i}.", inline=False)
             embed.set_field_at(1, name=f"Joined players", value=self.bet_players[guild_id], inline=False)
-            await msg.edit(embed=embed)
+            msg = await msg.edit(embed=embed)
             await asyncio.sleep(1)
         # Bet ended
         bet_max = self.gamble_calc(guild_id, 'bet', max)
@@ -402,7 +402,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
         if bet_sum == bet_max:
             embed.title = 'Nobody else bet, game cancelled.'
             embed.clear_fields()
-            await msg.edit(embed=embed)
+            msg = await msg.edit(embed=embed)
         else:
             result_str = ''
             roll_max = self.gamble_calc(guild_id, 'roll', max)
@@ -450,7 +450,7 @@ class PepeCoins(commands.Cog, name="Pepe Coins"):
                            f"Next unit cost: {cost_dict[k]['unit']:,.0f}\nNext upgrade cost: {cost_dict[k]['level']:,.0f}\n"
                            f"Spent on units: {spent_dict[k]['unit']:,.0f}\nSpent on upgrades: {spent_dict[k]['level']:,.0f}")
                 )
-            await msg.edit(embed=embed)
+            msg = await msg.edit(embed=embed)
             await asyncio.sleep(1)
         await con.execute(f"UPDATE {self.psql_table_name} SET stats.tcoins=(stats).tcoins+$2,stats.last_tick=$3 WHERE (player).id=$1",
                           p_id, pu.tick(p), datetime.now(timezone.utc))

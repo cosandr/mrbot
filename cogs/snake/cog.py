@@ -43,11 +43,11 @@ class SnakeCog(commands.Cog, name="Snake"):
                 try:
                     moves[move_dir]()
                     msg_content = f"Game running, score: {len(snake)-1}" + snake.field.discord()
-                    await self.game_msg.edit(content=msg_content)
+                    self.game_msg = await self.game_msg.edit(content=msg_content)
                     await asyncio.sleep(2)
                 except asyncio.CancelledError:
                     msg_content = f"Timed out.\nScore: {len(snake)-1}" + snake.field.discord()
-                    await self.game_msg.edit(content=msg_content)
+                    self.game_msg = await self.game_msg.edit(content=msg_content)
                     break
                 except SnakeDiedError as ded:
                     await self.game_msg.clear_reactions()

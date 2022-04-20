@@ -155,7 +155,7 @@ class Todo(commands.Cog, name="Todo"):
                     name = all_fields[i]['name']
                     value = all_fields[i]['value']
                     embed.add_field(name=name, value=value, inline=False)
-                await msg.edit(content=f"{item_sum}Showing {start}-{end} out of {len(all_fields)}.", embed=embed)
+                msg = await msg.edit(content=f"{item_sum}Showing {start}-{end} out of {len(all_fields)}.", embed=embed)
                 await msg.remove_reaction(em, user)
         # 15-16 goes to 10-11
         await msg.clear_reactions()
