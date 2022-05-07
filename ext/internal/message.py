@@ -473,8 +473,7 @@ class Message(Common):
             select_args += ', n.nick AS user_nick'
             from_args += f' LEFT JOIN {User.psql_table_name_nicks} n ON (m.user_id = n.user_id AND m.guild_id = n.guild_id)'
         if with_author:
-            select_args += (', u.name AS user_name, u.discriminator AS user_discriminator, u.avatar AS user_avatar'
-                            ', u.activity AS user_activity, u.mobile AS user_mobile')
+            select_args += ', u.name AS user_name, u.discriminator AS user_discriminator, u.avatar AS user_avatar'
             from_args += f' INNER JOIN {User.psql_table_name} u ON (m.user_id = u.id)'
         if with_channel:
             select_args += ', c.name AS ch_name, c.voice AS ch_voice'
