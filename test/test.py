@@ -70,8 +70,8 @@ class Test:
             print(status)
 
     def test_emoji(self):
-        from emoji import EMOJI_UNICODE
-        all_emoji = set(EMOJI_UNICODE.values())
+        from emoji import EMOJI_DATA
+        all_emoji = set(EMOJI_DATA.keys())
         test_data = {
             r"no emoji here": 0,           # None
             r"Hello 🏃‍♂️": 1,              # Man running

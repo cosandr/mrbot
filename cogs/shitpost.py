@@ -11,7 +11,7 @@ import discord
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps
 from discord.ext import commands
-from emoji import EMOJI_UNICODE
+from emoji import EMOJI_DATA
 
 import ext.embed_helpers as emh
 from ext import utils
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class Shitpost(commands.Cog, name='Shitposting'):
     def __init__(self, bot):
         self.bot: MrBot = bot
-        self.all_emoji = list(EMOJI_UNICODE.values())
+        self.all_emoji = list(EMOJI_DATA.keys())
 
     @commands.command(name='father', brief="Bustin' games", aliases=['textbuster', 'madeby'])
     async def post_gamebuster_image(self, ctx: Context):
