@@ -7,9 +7,9 @@ import uuid
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-import PIL
 import discord
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps
 from discord.ext import commands
 from emoji import EMOJI_UNICODE
 
@@ -55,7 +55,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         if not res:
             return await emh.embed_img_not_found(msg, embed)
         else:
-            img = PIL.Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
+            img = Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
             embed.set_footer(text=f"ASCII'ing {res.author.display_name}'s image.", icon_url=embed.footer.icon_url)
             msg = await msg.edit(embed=embed)
         # Prevent large images for anyone except owner.
@@ -82,7 +82,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
         if not res:
             return await emh.embed_img_not_found(msg, embed)
         else:
-            img = PIL.Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
+            img = Image.open(await utils.bytes_from_url(res.first_image, self.bot.aio_sess))
             start = time.perf_counter()
             filename = await self.bot.loop.run_in_executor(None, lambda: self.img_ruin(img))
             embed.title = f"{res.author.display_name}'s image has been ruined"
@@ -315,7 +315,7 @@ class Shitpost(commands.Cog, name='Shitposting'):
 
         return "".join(msg_list)
 
-    def img_ascii(self, img: PIL.Image, char_x: int, embed: discord.Embed):
+    def img_ascii(self, img: Image, char_x: int, embed: discord.Embed):
         """ASCII'fy an image"""
         start = time.perf_counter()
         char_y = int(char_x*(img.height/img.width))
@@ -336,9 +336,9 @@ class Shitpost(commands.Cog, name='Shitposting'):
                         ret_str += f"{asciichars[i]:2s}"
                         break
             ret_str += '\n'
-        img_draw = PIL.Image.new("RGB", (char_x * 12, char_y * 12))
-        draw = PIL.ImageDraw.Draw(img_draw)
-        font = PIL.ImageFont.truetype('fonts/consola.ttf', 10)
+        img_draw = Image.new("RGB", (char_x * 12, char_y * 12))
+        draw = ImageDraw.Draw(img_draw)
+        font = ImageFont.truetype('fonts/consola.ttf', 10)
         draw.text((0, 0), ret_str, font=font)
         filename = f"ascii_{uuid.uuid4().hex}.jpg"
         filepath = os.path.join(self.bot.config.paths.upload, filename)
@@ -348,17 +348,17 @@ class Shitpost(commands.Cog, name='Shitposting'):
         embed.set_field_at(1, name="Resolution", value=f"{img_draw.width}x{img_draw.height}", inline=True)
         return embed, filename, start
 
-    def img_ruin(self, img: PIL.Image) -> str:
+    def img_ruin(self, img: Image) -> str:
         # Start image brains.
-        img_out = img.filter(PIL.ImageFilter.EDGE_ENHANCE_MORE)  # kinda like sharpen
-        img_out = img_out.filter(PIL.ImageFilter.BoxBlur(random.randint(1, 5)))
-        img_out = img_out.filter(PIL.ImageFilter.MinFilter(random.randrange(3, 11 + 1, 2)))
-        enhancer = PIL.ImageEnhance.Sharpness(img_out)
+        img_out = img.filter(ImageFilter.EDGE_ENHANCE_MORE)  # kinda like sharpen
+        img_out = img_out.filter(ImageFilter.BoxBlur(random.randint(1, 5)))
+        img_out = img_out.filter(ImageFilter.MinFilter(random.randrange(3, 11 + 1, 2)))
+        enhancer = ImageEnhance.Sharpness(img_out)
         factor = random.randint(200, 500)
         img_out = enhancer.enhance(factor)
         # Sometimes flip the image
         if random.randint(1, 50) > 40:
-            img_out = PIL.ImageOps.mirror(img_out)
+            img_out = ImageOps.mirror(img_out)
         # Make it trash resolution
         img_out = img_out.resize((int(img.width/random.randint(2, 5)), int(img.height/random.randint(2, 5))))
         img_out = img_out.resize((img.width, img.height))
