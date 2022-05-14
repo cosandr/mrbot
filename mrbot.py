@@ -1,4 +1,5 @@
 import asyncio
+import aiowebdav.client
 import json
 import logging
 import os
@@ -34,6 +35,7 @@ class MrBot(commands.Bot):
         self.aio_sess: Optional[ClientSession] = None
         self.unix_sess: Optional[ClientSession] = None
         self.pool: Optional[asyncpg.pool.Pool] = None
+        self.webdav_client: Optional[aiowebdav.client.Client] = None
         self._close_ran: bool = False
         self.cleanup_tasks: List[asyncio.Task] = []
         # --- Logger ---
@@ -111,6 +113,14 @@ class MrBot(commands.Bot):
         if self.config.brains.startswith('/'):
             self.logger.info("Unix session initialized.")
             self.unix_sess = ClientSession(connector=UnixConnector(path=self.config.brains))
+        self.logger.info("Initializing WebDAV client")
+        options = {
+            'webdav_hostname': self.config.webdav.upload_url,
+            'webdav_login': self.config.webdav.login,
+            'webdav_password': self.config.webdav.password,
+        }
+        self.webdav_client = aiowebdav.client.Client(options)
+        self.logger.info("WebDAV connected to '%s' as '%s'", self.webdav_client.webdav.hostname, self.webdav_client.webdav.login)
         self.sess_ready.set()
         # Run as task to avoid deadlock
         asyncio.create_task(self.load_all_extensions())

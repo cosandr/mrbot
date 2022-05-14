@@ -218,7 +218,6 @@ class PostgresConfig(BaseConfig):
 class PathsConfig(BaseConfig):
     def __init__(self, **kwargs):
         self.data: str = kwargs.pop('data', './data')
-        self.upload: str = kwargs.pop('upload', './upload')
 
     @property
     def data(self):
@@ -228,15 +227,6 @@ class PathsConfig(BaseConfig):
     def data(self, p):
         self._verify_path(p)
         self._data = p
-
-    @property
-    def upload(self):
-        return self._upload
-
-    @upload.setter
-    def upload(self, p):
-        self._verify_path(p)
-        self._upload = p
 
     @staticmethod
     def _verify_path(p):
@@ -253,6 +243,29 @@ class ChannelsConfig(BaseConfig):
         self.test: int = kwargs.pop('test', None)
 
 
+class WebdavConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        self.upload_url = kwargs.pop('upload_url', None)
+        self.download_url = kwargs.pop('download_url', self.upload_url)
+        self.login = kwargs.pop('login', None)
+        self.password = kwargs.pop('password', None)
+
+    def safe_repr(self, _level=0):
+        """Like pretty_repr but hides passwords"""
+        attrs = []
+        for k, v in vars(self).items():
+            if not v:
+                continue
+            name = k
+            if name[0] == '_':
+                name = name[1:]
+            if name == 'password':
+                attrs.append(f'{" " * _level * 2}{name}: {v[:2]}...{v[-1:]}')
+            else:
+                attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
+        return "\n".join(attrs)
+
+
 class BotConfig(BaseConfig):
     """Global bot config, will not start without most of it"""
     psql_table_name = 'bot_config'
@@ -267,7 +280,7 @@ class BotConfig(BaseConfig):
     psql_all_tables = {(psql_table_name,): psql_table}
 
     def __init__(self, token, psql, api_keys=None, approved_guilds=None, brains='',
-                 guilds=None, hostname='', paths=None, channels=None):
+                 guilds=None, hostname='', paths=None, channels=None, webdav=None):
         self.token: str = token
         self.psql: PostgresConfig = psql
         self.api_keys: dict = api_keys or dict()
@@ -277,6 +290,7 @@ class BotConfig(BaseConfig):
         self.hostname: str = hostname
         self.paths: PathsConfig = paths
         self.channels: ChannelsConfig = channels
+        self.webdav: WebdavConfig = webdav
 
     def safe_repr(self, _level=0):
         """Like pretty_repr but shorter and hides sensitive information (token, API keys)"""
@@ -310,6 +324,7 @@ class BotConfig(BaseConfig):
         kwargs = dict(psql=PostgresConfig(), api_keys={}, approved_guilds=[], guilds={})
         _paths = dict()
         _channels = dict()
+        _webdav = dict()
         for d in data.get('configs', []):
             if v := d.get('token'):
                 kwargs['token'] = v
@@ -328,6 +343,8 @@ class BotConfig(BaseConfig):
                 _paths[name] = val
             for name, val in d.get('channels', {}).items():
                 _channels[name] = val
+            for name, val in d.get('webdav', {}).items():
+                _webdav[name] = val
 
         for d in data.get('guilds', []):
             g = GuildDef.from_dict(d)
@@ -335,6 +352,7 @@ class BotConfig(BaseConfig):
 
         kwargs['paths'] = PathsConfig(**_paths)
         kwargs['channels'] = ChannelsConfig(**_channels)
+        kwargs['webdav'] = WebdavConfig(**_webdav)
 
         if not kwargs.get('token'):
             raise RuntimeError('Token not found in config')

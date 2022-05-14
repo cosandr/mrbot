@@ -14,3 +14,4 @@ dateparser>=1.1,<2.0
 pytimeparse>=1.1,<2.0
 # Always use latest youtube-dl
 youtube_dl>=2021.12.17
+aiowebdav>=0.1<=0.2

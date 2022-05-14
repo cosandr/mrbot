@@ -45,6 +45,21 @@ Examples:
  - `CONFIG_DSN='postgres://user:password@localhost/db' ./launcher.py psql-config --env`
  - `./launcher.py psql-config -f config/.dsn`
 
+## JSON queries
+
+Check config
+```postgresql
+SELECT jsonb_pretty(data) FROM bot_config WHERE name='main';
+
+-- Merge (update) entire object
+UPDATE bot_config SET data = data || '{"webdav": {"upload_url": "example.com", "login": "test", "password": "secret"}}' WHERE name='main';
+
+-- Update single object
+UPDATE bot_config SET data = jsonb_set(data, '{webdav,upload_url}', '"another.example.com"') WHERE name='main';
+
+-- Delete key
+UPDATE bot_config SET data = data #- '{webdav,hostname}' WHERE name='main';
+```
 
 ### JSON config
 
