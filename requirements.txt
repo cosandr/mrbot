@@ -1,4 +1,4 @@
-git+https://github.com/Rapptz/discord.py@10af1ea#egg=discord.py[voice]
+discord.py[voice]>=2.0,<2.1
 emoji>=1.7,<2.0
 jellyfish>=0.9,<1.0
 numpy>=1.22,<2.0
