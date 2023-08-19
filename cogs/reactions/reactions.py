@@ -247,21 +247,21 @@ class Reactions(commands.Cog, name="Reaction"):
                 err_str = f"{in_str} already exists as a {k} reaction."
         return valid, err_str
 
-    async def _send_super_easy(self, channel: discord.TextChannel):
+    async def _send_super_easy(self, message: discord.Message):
         # Short pause
         await asyncio.sleep(random.randint(300, 1200) / 1000)
         try:
-            await channel.send("Barely an inconvenience!")
+            await message.reply("Barely an inconvenience!")
         except (discord.errors.Forbidden, discord.errors.HTTPException) as e:
-            self.logger.warning("Failed to respond to 'super easy' in channel %s: %s", channel.id, str(e))
+            self.logger.warning("Failed to respond to 'super easy', message ID %s: %s", message.id, str(e))
 
-    async def _send_wow(self, channel: discord.TextChannel):
+    async def _send_wow(self, message: discord.Message):
         # Dramatic pause
         await asyncio.sleep(random.randint(1, 4))
         try:
-            await channel.send("wow")
+            await message.reply("wow")
         except (discord.errors.Forbidden, discord.errors.HTTPException) as e:
-            self.logger.warning("Failed to respond to 'wow wow wow' in channel %s: %s", channel.id, str(e))
+            self.logger.warning("Failed to respond to 'wow wow wow', message ID %s: %s", message.id, str(e))
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
@@ -306,9 +306,9 @@ class Reactions(commands.Cog, name="Reaction"):
             return
         # Pitch Meeting
         if self.re_super_easy.search(message.content):
-            asyncio.create_task(self._send_super_easy(message.channel))
+            asyncio.create_task(self._send_super_easy(message))
         elif self.re_wow.search(message.content):
-            asyncio.create_task(self._send_wow(message.channel))
+            asyncio.create_task(self._send_wow(message))
         # Add unicode emoji
         react_added = set()
         for m in self.re_em_unicode.finditer(message.content):
