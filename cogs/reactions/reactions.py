@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import itertools
 import logging
 import random
@@ -44,6 +45,8 @@ class Reactions(commands.Cog, name="Reaction"):
         # Regex compile
         self.re_ruski = re.compile(r'[бвгджзклмнпрстфхцчшщаэыуояеёюи]', re.IGNORECASE)
         self.re_crab = re.compile(r'is\s+gone', re.IGNORECASE)
+        self.re_super_easy = re.compile(r'super\s+easy$', re.IGNORECASE)
+        self.re_wow = re.compile(r'wow\s+wow\s+wow$', re.IGNORECASE)
         self.re_url = re.compile(r'https?://\S+')
         self.re_gyazo = re.compile(r'https://gyazo\.com/\w{32}')
         self.re_twitch = re.compile(r'https?://(clips\.|www\.)?twitch\S+')
@@ -244,6 +247,22 @@ class Reactions(commands.Cog, name="Reaction"):
                 err_str = f"{in_str} already exists as a {k} reaction."
         return valid, err_str
 
+    async def _send_super_easy(self, channel: discord.TextChannel):
+        # Short pause
+        await asyncio.sleep(random.randint(300, 1200) / 1000)
+        try:
+            await channel.send("Barely an inconvenience!")
+        except (discord.errors.Forbidden, discord.errors.HTTPException) as e:
+            self.logger.warning("Failed to respond to 'super easy' in channel %s: %s", channel.id, str(e))
+
+    async def _send_wow(self, channel: discord.TextChannel):
+        # Dramatic pause
+        await asyncio.sleep(random.randint(1, 4))
+        try:
+            await channel.send("wow")
+        except (discord.errors.Forbidden, discord.errors.HTTPException) as e:
+            self.logger.warning("Failed to respond to 'wow wow wow' in channel %s: %s", channel.id, str(e))
+
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
         if len(reaction.message.reactions) >= 20:
@@ -285,6 +304,11 @@ class Reactions(commands.Cog, name="Reaction"):
         # Ignore blacklisted channels
         if message.channel.id in self.config.on_message_ignore_channels:
             return
+        # Pitch Meeting
+        if self.re_super_easy.search(message.content):
+            asyncio.create_task(self._send_super_easy(message.channel))
+        elif self.re_wow.search(message.content):
+            asyncio.create_task(self._send_wow(message.channel))
         # Add unicode emoji
         react_added = set()
         for m in self.re_em_unicode.finditer(message.content):
