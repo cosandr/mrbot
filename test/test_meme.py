@@ -87,6 +87,7 @@ class TestMeme:
             'left-center': [-1, 0], 'center': [0, 0], 'right-center': [1, 0],
             'left-bottom': [-1, -1], 'center-bottom': [0, -1], 'right-bottom': [1, -1],
         }
+        # TODO: https://pillow.readthedocs.io/en/stable/releasenotes/10.0.0.html#font-size-and-offset-methods
         text_size = font.getsize(text)
         print(f'Text size: {text_size}, box size: {box_size}')
         for name, position in pos_dict.items():
