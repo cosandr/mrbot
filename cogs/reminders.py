@@ -365,6 +365,11 @@ class Reminders(commands.Cog, name="Reminders"):
         if self._sleep_task is not None and not self._sleep_task.done():
             self.logger.debug("Cancelling sleep task")
             self._sleep_task.cancel()
+            try:
+                await self._sleep_task
+            except asyncio.CancelledError:
+                pass
+            self.logger.debug("Worker finished waiting for task to be cancelled")
         while True:
             try:
                 self.logger.debug("Fetching latest job")
