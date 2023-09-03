@@ -361,13 +361,18 @@ class Reminders(commands.Cog, name="Reminders"):
         return parsed_ts, parsed_repeat, channel, users
 
     async def refresh_worker(self):
+        self.logger.debug("Refreshing worker")
         if self._sleep_task is not None and not self._sleep_task.done():
+            self.logger.debug("Cancelling sleep task")
             self._sleep_task.cancel()
         while True:
             try:
+                self.logger.debug("Fetching latest job")
                 async with self.bot.pool.acquire() as con:
                     q = f"SELECT * FROM {self.psql_table_name} WHERE done=false AND failed=false ORDER BY notify_ts ASC LIMIT 1"
                     res = await con.fetchrow(q)
+                if res:
+                    self.logger.debug("Job %d - Found", res['id'])
                 break
             except asyncpg.exceptions.PostgresConnectionError as e:
                 self.logger.warning("Cannot refresh worker: %s", str(e))
@@ -375,7 +380,7 @@ class Reminders(commands.Cog, name="Reminders"):
         if not res:
             self.logger.debug("No remaining reminders")
             return
-        self.logger.debug("Starting sleep task for reminder %d", res['id'])
+        self.logger.debug("Job %d - Starting sleep task", res['id'])
         self._sleep_task = asyncio.create_task(self.sleep_worker(res))
 
     async def fire_reminder(self, res: asyncpg.Record):
@@ -384,11 +389,12 @@ class Reminders(commands.Cog, name="Reminders"):
             q_failed = f"UPDATE {self.psql_table_name} SET failed=true WHERE id=$1"
             repeat_td = timedelta(seconds=res['repeat']) if res['repeat'] else None
             repeat_n = res['repeat_n']
-            self.logger.debug("Repeat: %s", utils.human_seconds(res['repeat']) if res['repeat'] else 'N/A')
+            self.logger.debug("Job %d - Repeat: %s", res['id'], utils.human_seconds(res['repeat']) if res['repeat'] else 'N/A')
             async with self.bot.pool.acquire() as con:
                 if not ch:
-                    self.logger.error("Could not find channel %s for reminder ID %d", res['channel_id'], res['id'])
+                    self.logger.error("Job %d - Marking failed, could not find channel %d",  res['id'], res['channel_id'])
                     await con.execute(q_failed, res['id'])
+                    self.logger.debug("Job %d - Marked as failed due to missing channel", res['id'])
                     return
                 try:
                     mentions = [User(id_=res['owner_id']).mention()]
@@ -397,34 +403,43 @@ class Reminders(commands.Cog, name="Reminders"):
                     if repeat_td and (repeat_n is None or repeat_n > 1):
                         new_repeat_n = repeat_n - 1 if repeat_n else None
                         new_dt = datetime.now(timezone.utc) + repeat_td
-                        self.logger.debug("New time for reminder %d: %s", res['id'], utils.human_timedelta_short(new_dt))
+                        self.logger.debug("Job %d - New time '%s', repeat '%s'", res['id'], new_dt.isoformat(), new_repeat_n)
                         q = f"UPDATE {self.psql_table_name} SET notify_ts=$2,repeat_n=$3 WHERE id=$1"
                         await con.execute(q, res['id'], new_dt, new_repeat_n)
+                        self.logger.debug("Job %d - New time set in database", res['id'])
                     else:
+                        self.logger.debug("Job %d - Marking done", res['id'])
                         q = f"UPDATE {self.psql_table_name} SET done=true,repeat_n=NULL WHERE id=$1"
                         await con.execute(q, res['id'])
+                        self.logger.debug("Job %d - Marked done", res['id'])
+
                     q = f"SELECT * FROM {self.psql_table_name} WHERE id=$1"
+                    self.logger.debug("Job %d - Fetching updated data", res['id'])
                     new_res = await con.fetchrow(q, res['id'])
                     embed = await self.reminder_show_item(new_res, firing=True)
-                    await ch.send(content=" ".join(mentions), embed=embed)
+                    msg = await ch.send(content=" ".join(mentions), embed=embed)
+                    self.logger.debug("Job %d - Sent message %d in channel %d", res['id'], msg.id, ch.id)
                 except discord.DiscordException as e:
-                    self.logger.error("Could not send reminder ID %d: %s", res['id'], str(e))
+                    self.logger.error("Job %d - Could not send reminder: %s", res['id'], str(e))
                     await con.execute(q_failed, res['id'])
+                    self.logger.debug("Job %d - Marked as failed due to Discord error", res['id'])
         finally:
             await self.refresh_worker()
 
     async def sleep_worker(self, r: asyncpg.Record):
+        self.logger.debug("Job %d - Starting sleep worker, job time '%s'", r['id'], r['notify_ts'].isoformat())
         try:
             start = datetime.now(timezone.utc)
             if start >= r['notify_ts']:
-                self.logger.debug("Reminder %d overdue [%s]", r['id'], utils.human_timedelta_short(r['notify_ts']))
+                self.logger.debug("Job %d - Overdue, current time '%s'", r['id'], start.isoformat())
                 asyncio.create_task(self.fire_reminder(r))
                 return
             duration = abs((start - r['notify_ts']).total_seconds())
-            self.logger.debug("Reminder %d due in %s [%d seconds]", r['id'], utils.human_seconds(duration), duration)
+            self.logger.debug("Job %d - Due in %s [%d seconds]", r['id'], utils.human_seconds(duration), duration)
             await asyncio.sleep(duration)
             asyncio.create_task(self.fire_reminder(r))
         except asyncio.CancelledError:
+            self.logger.debug("Job %d - Sleep worker cancelled", r['id'])
             return
 
 

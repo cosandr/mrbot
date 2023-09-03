@@ -116,6 +116,7 @@ class Verses(commands.Cog):
                 self.verses.aliases.append(vt.name)
                 count = await con.fetchval(f"SELECT count(*) FROM {Verses.psql_table_name} WHERE type=$1", vt.value)
                 if not count:
+                    self.logger.info("Found no verses of type '%s' in database", vt.name)
                     await self._load_verses(con, vt)
         await self.bot.wait_until_ready()
         await self.refresh_worker()
@@ -479,13 +480,18 @@ class Verses(commands.Cog):
         return parsed_ts, parsed_repeat, parsed_delay, channel
 
     async def refresh_worker(self):
+        self.logger.debug("Refreshing worker")
         if self._sleep_task is not None and not self._sleep_task.done():
+            self.logger.debug("Cancelling sleep task")
             self._sleep_task.cancel()
         while True:
             try:
+                self.logger.debug("Fetching latest job")
                 async with self.bot.pool.acquire() as con:
                     q = f"SELECT * FROM {self.psql_table_name_channels} ORDER BY notify_ts ASC LIMIT 1"
                     res = await con.fetchrow(q)
+                if res:
+                    self.logger.debug("Job %d - Found", res['id'])
                 break
             except asyncpg.exceptions.PostgresConnectionError as e:
                 self.logger.warning("Cannot refresh worker: %s", str(e))
@@ -493,30 +499,35 @@ class Verses(commands.Cog):
         if not res:
             self.logger.debug("No scheduled verses remaining")
             return
-        self.logger.debug("Starting sleep task for job %d", res['id'])
+        self.logger.debug("Job %d - Starting sleep task", res['id'])
         self._sleep_task = asyncio.create_task(self.sleep_worker(res))
 
     async def fire_verse(self, res: asyncpg.Record):
         try:
             ch = self.bot.get_channel(res['channel_id'])
             repeat_td = timedelta(seconds=res['repeat'])
-            self.logger.debug("Repeat: %s", utils.human_seconds(res['repeat']))
+            self.logger.debug("Job %d - Repeat: %s", res['id'], utils.human_seconds(res['repeat']))
             verse = None
             async with self.bot.pool.acquire() as con:
                 try:
                     if not ch:
-                        self.logger.error("Channel not found, deleted job ID %d", res['id'])
+                        self.logger.error("Job %d - Deleting, could not find channel %d",  res['id'], res['channel_id'])
                         await con.execute(f"DELETE FROM {self.psql_table_name_channels} WHERE id=$1", res['id'])
+                        self.logger.debug("Job %d - Deleted", res['id'])
                         return
-                    new_dt_ref = res['notify_ts_ref'] + repeat_td
+                    new_dt_ref: datetime = res['notify_ts_ref'] + repeat_td
+                    _count = 0
                     while new_dt_ref < datetime.now(timezone.utc):
                         new_dt_ref += repeat_td
+                        _count += 1
                     new_dt = new_dt_ref
+                    self.logger.debug("Job %d - New reference time '%s' found in %d iterations", res['id'], new_dt_ref.isoformat(), _count)
                     if res['delay']:
                         new_dt += timedelta(seconds=random.randint(0, res['delay']))
-                    self.logger.debug("Time for next job %d: %s", res['id'], utils.human_timedelta_short(new_dt))
+                    self.logger.debug("Job %d - New time '%s'", res['id'], new_dt.isoformat())
                     q = f"UPDATE {self.psql_table_name_channels} SET notify_ts=$2, notify_ts_ref=$3 WHERE id=$1"
                     await con.execute(q, res['id'], new_dt, new_dt_ref)
+                    self.logger.debug("Job %d - New times set in database", res['id'])
 
                     # Fetch and send verse
                     q = f"SELECT * FROM {self.psql_table_name} WHERE type=$1 ORDER BY random() LIMIT 1"
@@ -526,28 +537,33 @@ class Verses(commands.Cog):
                     else:
                         q_args.append(random.choice(self.verse_types).value)
 
+                    self.logger.debug("Job %d - Fetching random verse of type %d", res['id'], q_args[0])
                     verse = await con.fetchrow(q, *q_args)
+                    self.logger.debug("Job %d - Got verse ID '%d'", res['id'], verse['id'])
                     embed = self.show_verse(verse)
-                    await ch.send(embed=embed)
+                    msg = await ch.send(embed=embed)
+                    self.logger.debug("Job %d - Sent message %d in channel %d", res['id'], msg.id, ch.id)
                 except discord.DiscordException as e:
-                    self.logger.error("Job failed %d: %s", res['id'], str(e))
+                    self.logger.error("Job %d - Job failed: %s", res['id'], str(e))
                     if verse is not None:
-                        self.logger.error("Verse ID was %d", verse['id'])
+                        self.logger.debug("Job %d - Verse ID was %d", res['id'], verse['id'])
         finally:
             await self.refresh_worker()
 
     async def sleep_worker(self, r: asyncpg.Record):
+        self.logger.debug("Job %d - Starting sleep worker, job time '%s'", r['id'], r['notify_ts'].isoformat())
         try:
             start = datetime.now(timezone.utc)
             if start >= r['notify_ts']:
-                self.logger.debug("Job %d overdue [%s]", r['id'], utils.human_timedelta_short(r['notify_ts']))
+                self.logger.debug("Job %d - Overdue, current time '%s'", r['id'], start.isoformat())
                 asyncio.create_task(self.fire_verse(r))
                 return
             duration = abs((start - r['notify_ts']).total_seconds())
-            self.logger.debug("Job %d due in %s [%d seconds]", r['id'], utils.human_seconds(duration), duration)
+            self.logger.debug("Job %d - Due in %s [%d seconds]", r['id'], utils.human_seconds(duration), duration)
             await asyncio.sleep(duration)
             asyncio.create_task(self.fire_verse(r))
         except asyncio.CancelledError:
+            self.logger.debug("Job %d - Sleep worker cancelled", r['id'])
             return
 
 
