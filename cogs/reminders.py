@@ -407,8 +407,12 @@ class Reminders(commands.Cog, name="Reminders"):
                         mentions += [User(id_=r).mention() for r in res['recipients']]
                     if repeat_td and (repeat_n is None or repeat_n > 1):
                         new_repeat_n = repeat_n - 1 if repeat_n else None
-                        new_dt = datetime.now(timezone.utc) + repeat_td
-                        self.logger.debug("Job %d - New time '%s', repeat '%s'", res['id'], new_dt.isoformat(), new_repeat_n)
+                        new_dt: datetime = res['notify_ts'] + repeat_td
+                        _count = 0
+                        while new_dt < datetime.now(timezone.utc):
+                            new_dt += repeat_td
+                            _count += 1
+                        self.logger.debug("Job %d - New time '%s' found in %d iterations, repeat '%s'", res['id'], new_dt.isoformat(), _count, new_repeat_n)
                         q = f"UPDATE {self.psql_table_name} SET notify_ts=$2,repeat_n=$3 WHERE id=$1"
                         await con.execute(q, res['id'], new_dt, new_repeat_n)
                         self.logger.debug("Job %d - New time set in database", res['id'])
