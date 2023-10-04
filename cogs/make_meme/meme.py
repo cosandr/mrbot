@@ -119,7 +119,8 @@ class MemeTemplate:
         return img
 
     def _tsize(self, text: str, font):
-        return self._draw.multiline_textsize(text, font=font, spacing=self._line_spacing, stroke_width=self._stroke_width)
+        left, top, right, bottom = self._draw.multiline_textbbox((0, 0), text, font=font, spacing=self._line_spacing, stroke_width=self._stroke_width)
+        return right - left, bottom - top
 
     def _fit_text(self, text: str, font_name: str, font_size: int, box_size: Tuple[int, int]) -> Tuple[str, ImageFont.FreeTypeFont]:
         font = self._get_font(font_name, font_size)
