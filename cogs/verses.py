@@ -536,20 +536,21 @@ class Verses(commands.Cog):
 
                     # Fetch and send verse
                     q = f"SELECT * FROM {self.psql_table_name} WHERE type=$1 ORDER BY random() LIMIT 1"
-                    q_args = []
                     if res['type']:
-                        q_args.append(res['type'])
+                        chosen_type = self.get_verse_type(res['type'])
+                        self.logger.debug("Job %d - Using requested type '%s'", res['id'], chosen_type.name)
                     else:
-                        q_args.append(random.choice(self.verse_types).value)
+                        chosen_type = random.choice(self.verse_types)
+                        logging.debug("Job %d - Picked random type '%s' from possible: %s", res['id'], chosen_type.name, ', '.join([t.name for t in self.verse_types]))
 
-                    self.logger.debug("Job %d - Fetching random verse of type %d", res['id'], q_args[0])
-                    verse = await con.fetchrow(q, *q_args)
+                    self.logger.debug("Job %d - Fetching random verse of type %s [%d]", res['id'], chosen_type.name, chosen_type.value)
+                    verse = await con.fetchrow(q, chosen_type.value)
                     self.logger.debug("Job %d - Got verse ID '%d'", res['id'], verse['id'])
                     embed = self.show_verse(verse)
                     msg = await ch.send(embed=embed)
                     self.logger.debug("Job %d - Sent message %d in channel %d", res['id'], msg.id, ch.id)
                 except discord.DiscordException as e:
-                    self.logger.error("Job %d - Job failed: %s", res['id'], str(e))
+                    self.logger.error("Job %d - Discord failure: %s", res['id'], str(e))
                     if verse is not None:
                         self.logger.debug("Job %d - Verse ID was %d", res['id'], verse['id'])
         finally:
