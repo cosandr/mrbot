@@ -541,7 +541,7 @@ class Verses(commands.Cog):
                         self.logger.debug("Job %d - Using requested type '%s'", res['id'], chosen_type.name)
                     else:
                         chosen_type = random.choice(self.verse_types)
-                        logging.debug("Job %d - Picked random type '%s' from possible: %s", res['id'], chosen_type.name, ', '.join([t.name for t in self.verse_types]))
+                        self.logger.debug("Job %d - Picked random type '%s' from possible: %s", res['id'], chosen_type.name, ', '.join([t.name for t in self.verse_types]))
 
                     self.logger.debug("Job %d - Fetching random verse of type %s [%d]", res['id'], chosen_type.name, chosen_type.value)
                     verse = await con.fetchrow(q, chosen_type.value)
