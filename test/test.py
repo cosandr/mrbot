@@ -140,6 +140,7 @@ class Test:
     async def copy_tables(self, num_cons: int = 12, max_elem=None):
         src_pool = self.bot.pool_live
         dst_pool = self.bot.pool
+        # TODO: Use con._params
         confirm = (f'CONFIRM COPY FROM {src_pool._working_params.database} AS {src_pool._working_params.user} '
                    f'TO {dst_pool._working_params.database} AS {dst_pool._working_params.user}? ')
         if input(confirm) != 'y':

@@ -104,8 +104,12 @@ class MrBot(commands.Bot):
 
         self.sess_ready.clear()
         self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init)
-        # noinspection PyProtectedMember
-        self.logger.info(f"Pool connected to database `{self.pool._working_params.database}`.")
+        async with self.pool.acquire() as con:
+            try:
+                # noinspection PyProtectedMember
+                self.logger.info("Pool connected to database `%s`", con._params.database)
+            except Exception as e:
+                self.logger.warn("Cannot determine pool database: %s", str(e))
         self.aio_sess = ClientSession()
         self.logger.info("Aiohttp session initialized.")
         if self.config.brains.startswith('/'):
