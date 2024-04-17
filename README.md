@@ -64,10 +64,6 @@ Example `./launcher.py json-config -c config/config.json -g config/guild.json`
     },
     "api-keys": {
         "google": "",
-        "oxford": {
-          "app_id": "",
-          "app_key": ""
-        },
         "wolfram": ""
     },
     "approved_guilds": [],
