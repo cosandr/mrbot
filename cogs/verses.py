@@ -121,6 +121,10 @@ class Verses(commands.Cog):
         await self.bot.wait_until_ready()
         await self.refresh_worker()
 
+    async def cog_unload(self):
+        if self._sleep_task is not None and not self._sleep_task.done():
+            await self.cancel_sleep_task()
+
     async def _load_verses(self, con: asyncpg.Connection, vt: VerseType):
         download_path = os.path.join(tempfile.gettempdir(), f"verses_{vt.value}.txt")
         re_verse = re.compile(vt.regex)
@@ -479,15 +483,18 @@ class Verses(commands.Cog):
                 return await ctx.send(f"No channel {channel} found.")
         return parsed_ts, parsed_repeat, parsed_delay, channel
 
+    async def cancel_sleep_task(self):
+        self.logger.debug("Cancelling sleep task")
+        self._sleep_task.cancel()
+        try:
+            await self._sleep_task
+        except asyncio.CancelledError:
+            pass
+
     async def refresh_worker(self):
         self.logger.debug("Refreshing worker")
         if self._sleep_task is not None and not self._sleep_task.done():
-            self.logger.debug("Cancelling sleep task")
-            self._sleep_task.cancel()
-            try:
-                await self._sleep_task
-            except asyncio.CancelledError:
-                pass
+            await self.cancel_sleep_task()
             self.logger.debug("Worker finished waiting for task to be cancelled")
         while True:
             try:

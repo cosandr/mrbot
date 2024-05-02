@@ -62,6 +62,10 @@ class Reminders(commands.Cog, name="Reminders"):
         await self.bot.wait_until_ready()
         await self.refresh_worker()
 
+    async def cog_unload(self):
+        if self._sleep_task is not None and not self._sleep_task.done():
+            await self.cancel_sleep_task()
+
     @parsers.group(name='reminder', brief='Reminder group', invoke_without_command=True)
     async def reminder(self, ctx: Context):
         return
@@ -360,15 +364,18 @@ class Reminders(commands.Cog, name="Reminders"):
             users.append(u.id)
         return parsed_ts, parsed_repeat, channel, users
 
+    async def cancel_sleep_task(self):
+        self.logger.debug("Cancelling sleep task")
+        self._sleep_task.cancel()
+        try:
+            await self._sleep_task
+        except asyncio.CancelledError:
+            pass
+
     async def refresh_worker(self):
         self.logger.debug("Refreshing worker")
         if self._sleep_task is not None and not self._sleep_task.done():
-            self.logger.debug("Cancelling sleep task")
-            self._sleep_task.cancel()
-            try:
-                await self._sleep_task
-            except asyncio.CancelledError:
-                pass
+            await self.cancel_sleep_task()
             self.logger.debug("Worker finished waiting for task to be cancelled")
         while True:
             try:
