@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv bash
+
+cd /app || exit
+
+abc_home=$(eval echo "~abc")
+export MPLCONFIGDIR="${abc_home}/.config/matplotlib"
+export PGPASSFILE="${abc_home}/.pgpass"
+export HOME="${abc_home}"
+
+exec s6-setuidgid abc python launcher.py $LAUNCHER_ARGS
