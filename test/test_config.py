@@ -203,6 +203,7 @@ async def test_from_psql(mocker: pytest_mock.MockFixture):
             default_voice=453141750106882032,
             test=453141750106882033,
         ),
+        http=HttpConfig(),
     )
     assert config.token == expected_config.token
 
@@ -220,6 +221,9 @@ async def test_from_psql(mocker: pytest_mock.MockFixture):
     assert config.channels.exceptions == expected_config.channels.exceptions
     assert config.channels.default_voice == expected_config.channels.default_voice
     assert config.channels.test == expected_config.channels.test
+
+    assert config.http.host == expected_config.http.host
+    assert config.http.port == expected_config.http.port
 
 
 @pytest.mark.asyncio
@@ -315,6 +319,7 @@ async def test_from_env_psql_override(mocker: pytest_mock.MockFixture):
             default_voice=453141750106882032,
             test=453141750106882033,
         ),
+        http=HttpConfig(),
     )
     assert config.token == expected_config.token
 
@@ -333,6 +338,9 @@ async def test_from_env_psql_override(mocker: pytest_mock.MockFixture):
     assert config.channels.default_voice == expected_config.channels.default_voice
     assert config.channels.test == expected_config.channels.test
 
+    assert config.http.host == expected_config.http.host
+    assert config.http.port == expected_config.http.port
+
 
 @pytest.mark.asyncio
 async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
@@ -347,6 +355,8 @@ async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
         "DATA_PATH": "/env_data",
         "UPLOAD_PATH": "/env_upload",
         "BRAINS_PATH": "http://env_brains:7762",
+        "HTTP_SERVER_HOST": "0.0.0.0",
+        "HTTP_SERVER_PORT": "8888",
     }
     for k, v in set_env.items():
         os.environ[k] = v
@@ -404,6 +414,7 @@ async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
             default_voice=453141750106882032,
             test=453141750106882033,
         ),
+        http=HttpConfig(host="0.0.0.0", port=8888),
     )
     assert config.token == expected_config.token
 
@@ -421,3 +432,6 @@ async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
     assert config.channels.exceptions == expected_config.channels.exceptions
     assert config.channels.default_voice == expected_config.channels.default_voice
     assert config.channels.test == expected_config.channels.test
+
+    assert config.http.host == expected_config.http.host
+    assert config.http.port == expected_config.http.port
