@@ -22,8 +22,14 @@ def open_connection_check(path: str = ''):
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             url = urlparse(path)
-            short_path = f'{url.hostname}:{url.port}'
-            ok = sock.connect_ex((url.hostname, url.port)) == 0
+            if url.port:
+                port = url.port
+            elif url.scheme == "https":
+                port = 443
+            else:
+                port = 80
+            short_path = f'{url.hostname}:{port}'
+            ok = sock.connect_ex((url.hostname, port)) == 0
         sock.close()
         if not ok:
             raise ConnectionClosedError(short_path)
