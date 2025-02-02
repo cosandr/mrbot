@@ -1,4 +1,6 @@
 git+https://github.com/bryanforbes/asyncpg-stubs@master
 flake8>=4.0,<5.0
 pytest>=7.1,<8.0
+pytest-mock>=3.14,<3.15
 pytest-benchmark>=3.4,<4.0
+pytest-asyncio>=0.23.0,<0.24

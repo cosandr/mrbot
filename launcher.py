@@ -34,6 +34,11 @@ async def psql_config(args: argparse.Namespace):
     CONFIG = await BotConfig.from_psql(dsn=dsn, extra=args.extra)
 
 
+async def env_psql_config(args: argparse.Namespace):
+    global CONFIG
+    CONFIG = await BotConfig.from_env_psql(psql_configs=args.configs)
+
+
 parser = argparse.ArgumentParser(description='MrBot launcher')
 
 grp_bot = parser.add_argument_group(title='Bot options')
@@ -59,6 +64,10 @@ dsn_grp.add_argument('--env', action='store_true', help=f'Read DSN from {DSN_ENV
 dsn_grp.add_argument('-f', '--file', type=argparse.FileType('r'), help='Read DSN from file')
 parser_psql.add_argument('-e', '--extra', action='append', default=[], help='Extra configs to load')
 parser_psql.set_defaults(func=psql_config)
+
+parser_env_psql = subparsers.add_parser('env-psql-config', help='Start using env vars backed by PSQL config')
+parser_env_psql.add_argument('-c', '--configs', action='append', default=[], help='PSQL configs to load')
+parser_env_psql.set_defaults(func=env_psql_config)
 
 
 async def main():

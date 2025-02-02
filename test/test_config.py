@@ -1,3 +1,6 @@
+import pytest
+import pytest_mock
+
 from config.types import *
 
 
@@ -62,7 +65,7 @@ def test_guild_json():
         roles=expected_roles,
         text_channels=expected_text_channels,
     )
-    with open('test_config_guild.json', 'r') as f:
+    with open("test_config_guild.json", "r") as f:
         data = json.load(f)
     actual_guild = GuildDef.from_dict(data)
     # Check roles
@@ -119,3 +122,302 @@ def test_dump_role():
     }
     actual = role.to_dict()
     assert actual == expected
+
+
+@pytest.mark.asyncio
+async def test_from_psql(mocker: pytest_mock.MockFixture):
+    mock_pg_data = [
+        {
+            "name": "main",
+            "type": "config",
+            "data": json.dumps(
+                {
+                    "token": "main_token",
+                    "psql": {
+                        "main": "postgres://main_user:pass@/discord",
+                        "public": "postgres://main_user:pass@/public",
+                        "web": "postgres://main_user:pass@/web",
+                    },
+                    "api-keys": {"google": "main_google", "wolfram": "main_wolfram"},
+                    "approved_guilds": [],
+                    "brains": "http://main_brains:7762",
+                    "hostname": "https://www.main_example.com",
+                    "paths": {"data": "/main_data", "upload": "/main_upload"},
+                    "channels": {
+                        "exceptions": 444276260164665321,
+                        "default_voice": 453141750106882032,
+                        "test": 453141750106882033,
+                    },
+                }
+            ),
+        },
+        {
+            "name": "docker",
+            "type": "config",
+            "data": json.dumps(
+                {
+                    "paths": {
+                        "data": "/docker_data",
+                        "upload": "/docker_upload",
+                    },
+                    "brains": "http://docker_brains:7762",
+                }
+            ),
+        },
+        {
+            "name": "test",
+            "type": "guild",
+            "data": json.dumps(
+                {
+                    "id": 123,
+                    "name": "guild name",
+                }
+            ),
+        },
+    ]
+    mock_con = mocker.AsyncMock()
+    mock_con.fetch.return_value = mock_pg_data
+    mocker.patch("asyncpg.connect", return_value=mock_con)
+    mocker.patch.object(PathsConfig, "_verify_path")
+    config = await BotConfig.from_psql("", ["docker"])
+
+    expected_psql = PostgresConfig()
+    expected_psql.main = "postgres://main_user:pass@/discord"
+    expected_psql.public = "postgres://main_user:pass@/public"
+    expected_psql.web = "postgres://main_user:pass@/web"
+
+    expected_config = BotConfig(
+        token="main_token",
+        psql=expected_psql,
+        api_keys={"google": "main_google", "wolfram": "main_wolfram"},
+        approved_guilds=[],
+        brains="http://docker_brains:7762",
+        guilds={},
+        hostname="https://www.main_example.com",
+        paths=PathsConfig(
+            data="/docker_data",
+            upload="/docker_upload",
+        ),
+        channels=ChannelsConfig(
+            exceptions=444276260164665321,
+            default_voice=453141750106882032,
+            test=453141750106882033,
+        ),
+    )
+    assert config.token == expected_config.token
+
+    assert config.psql.main == expected_config.psql.main
+    assert config.psql.public == expected_config.psql.public
+    assert config.psql.web == expected_config.psql.web
+    assert config.psql.live == expected_config.psql.live
+
+    assert config.api_keys == expected_config.api_keys
+    assert config.approved_guilds == expected_config.approved_guilds
+    assert config.brains == expected_config.brains
+    assert config.hostname == expected_config.hostname
+    assert config.paths.data == expected_config.paths.data
+    assert config.paths.upload == expected_config.paths.upload
+    assert config.channels.exceptions == expected_config.channels.exceptions
+    assert config.channels.default_voice == expected_config.channels.default_voice
+    assert config.channels.test == expected_config.channels.test
+
+
+@pytest.mark.asyncio
+async def test_from_env_psql_override(mocker: pytest_mock.MockFixture):
+    set_env = {
+        "MAIN_DSN": "postgres://env_user:pass@/discord",
+        "WEB_DSN": "postgres://env_user:pass@/web",
+        "PUBLIC_DSN": "postgres://env_user:pass@/public",
+        "GOOGLE_API_KEY": "env_google",
+        "TOKEN": "env_token",
+        "WOLFRAM_API_KEY": "env_wolfram",
+        "MRBOT_HOSTNAME": "https://www.env_example.com",
+        "DATA_PATH": "/env_data",
+        "UPLOAD_PATH": "/env_upload",
+        "BRAINS_PATH": "http://env_brains:7762",
+    }
+    for k, v in set_env.items():
+        os.environ[k] = v
+    mock_pg_data = [
+        {
+            "name": "main",
+            "type": "config",
+            "data": json.dumps(
+                {
+                    "token": "main_token",
+                    "psql": {
+                        "main": "postgres://main_user:pass@/discord",
+                        "public": "postgres://main_user:pass@/public",
+                        "web": "postgres://main_user:pass@/web",
+                    },
+                    "api-keys": {"google": "main_google", "wolfram": "main_wolfram"},
+                    "approved_guilds": [],
+                    "brains": "http://main_brains:7762",
+                    "hostname": "https://www.main_example.com",
+                    "paths": {"data": "/main_data", "upload": "/main_upload"},
+                    "channels": {
+                        "exceptions": 444276260164665321,
+                        "default_voice": 453141750106882032,
+                        "test": 453141750106882033,
+                    },
+                }
+            ),
+        },
+        {
+            "name": "docker",
+            "type": "config",
+            "data": json.dumps(
+                {
+                    "paths": {
+                        "data": "/docker_data",
+                        "upload": "/docker_upload",
+                    },
+                    "brains": "http://docker_brains:7762",
+                }
+            ),
+        },
+        {
+            "name": "test",
+            "type": "guild",
+            "data": json.dumps(
+                {
+                    "id": 123,
+                    "name": "guild name",
+                }
+            ),
+        },
+    ]
+    mock_con = mocker.AsyncMock()
+    mock_con.fetch.return_value = mock_pg_data
+    mocker.patch("asyncpg.connect", return_value=mock_con)
+    mocker.patch.object(PathsConfig, "_verify_path")
+    config = await BotConfig.from_env_psql(["main", "docker"])
+
+    expected_psql = PostgresConfig()
+    expected_psql.main = "postgres://env_user:pass@/discord"
+    expected_psql.public = "postgres://env_user:pass@/public"
+    expected_psql.web = "postgres://env_user:pass@/web"
+
+    expected_config = BotConfig(
+        token="env_token",
+        psql=expected_psql,
+        api_keys={"google": "env_google", "wolfram": "env_wolfram"},
+        approved_guilds=[],
+        brains="http://env_brains:7762",
+        guilds={},
+        hostname="https://www.env_example.com",
+        paths=PathsConfig(
+            data="/env_data",
+            upload="/env_upload",
+        ),
+        channels=ChannelsConfig(
+            exceptions=444276260164665321,
+            default_voice=453141750106882032,
+            test=453141750106882033,
+        ),
+    )
+    assert config.token == expected_config.token
+
+    assert config.psql.main == expected_config.psql.main
+    assert config.psql.public == expected_config.psql.public
+    assert config.psql.web == expected_config.psql.web
+    assert config.psql.live == expected_config.psql.live
+
+    assert config.api_keys == expected_config.api_keys
+    assert config.approved_guilds == expected_config.approved_guilds
+    assert config.brains == expected_config.brains
+    assert config.hostname == expected_config.hostname
+    assert config.paths.data == expected_config.paths.data
+    assert config.paths.upload == expected_config.paths.upload
+    assert config.channels.exceptions == expected_config.channels.exceptions
+    assert config.channels.default_voice == expected_config.channels.default_voice
+    assert config.channels.test == expected_config.channels.test
+
+
+@pytest.mark.asyncio
+async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
+    set_env = {
+        "MAIN_DSN": "postgres://env_user:pass@/discord",
+        "WEB_DSN": "postgres://env_user:pass@/web",
+        "PUBLIC_DSN": "postgres://env_user:pass@/public",
+        "GOOGLE_API_KEY": "env_google",
+        "TOKEN": "env_token",
+        "WOLFRAM_API_KEY": "env_wolfram",
+        "MRBOT_HOSTNAME": "https://www.env_example.com",
+        "DATA_PATH": "/env_data",
+        "UPLOAD_PATH": "/env_upload",
+        "BRAINS_PATH": "http://env_brains:7762",
+    }
+    for k, v in set_env.items():
+        os.environ[k] = v
+    mock_pg_data = [
+        {
+            "name": "main",
+            "type": "config",
+            "data": json.dumps(
+                {
+                    "approved_guilds": [111112222233333444],
+                    "channels": {
+                        "exceptions": 444276260164665321,
+                        "default_voice": 453141750106882032,
+                        "test": 453141750106882033,
+                    },
+                }
+            ),
+        },
+        {
+            "name": "test",
+            "type": "guild",
+            "data": json.dumps(
+                {
+                    "id": 123,
+                    "name": "guild name",
+                }
+            ),
+        },
+    ]
+    mock_con = mocker.AsyncMock()
+    mock_con.fetch.return_value = mock_pg_data
+    mocker.patch("asyncpg.connect", return_value=mock_con)
+    mocker.patch.object(PathsConfig, "_verify_path")
+    config = await BotConfig.from_env_psql(["main"])
+
+    expected_psql = PostgresConfig()
+    expected_psql.main = "postgres://env_user:pass@/discord"
+    expected_psql.public = "postgres://env_user:pass@/public"
+    expected_psql.web = "postgres://env_user:pass@/web"
+
+    expected_config = BotConfig(
+        token="env_token",
+        psql=expected_psql,
+        api_keys={"google": "env_google", "wolfram": "env_wolfram"},
+        approved_guilds=[111112222233333444],
+        brains="http://env_brains:7762",
+        guilds={},
+        hostname="https://www.env_example.com",
+        paths=PathsConfig(
+            data="/env_data",
+            upload="/env_upload",
+        ),
+        channels=ChannelsConfig(
+            exceptions=444276260164665321,
+            default_voice=453141750106882032,
+            test=453141750106882033,
+        ),
+    )
+    assert config.token == expected_config.token
+
+    assert config.psql.main == expected_config.psql.main
+    assert config.psql.public == expected_config.psql.public
+    assert config.psql.web == expected_config.psql.web
+    assert config.psql.live == expected_config.psql.live
+
+    assert config.api_keys == expected_config.api_keys
+    assert config.approved_guilds == expected_config.approved_guilds
+    assert config.brains == expected_config.brains
+    assert config.hostname == expected_config.hostname
+    assert config.paths.data == expected_config.paths.data
+    assert config.paths.upload == expected_config.paths.upload
+    assert config.channels.exceptions == expected_config.channels.exceptions
+    assert config.channels.default_voice == expected_config.channels.default_voice
+    assert config.channels.test == expected_config.channels.test

@@ -193,11 +193,11 @@ class GuildDef(BaseConfig):
 
 
 class PostgresConfig(BaseConfig):
-    def __init__(self):
-        self.main: str = ''
-        self.public: str = ''
-        self.web: str = ''
-        self.live: str = ''
+    def __init__(self, **kwargs):
+        self.main: str = kwargs.pop('main', '')
+        self.public: str = kwargs.pop('public', '')
+        self.web: str = kwargs.pop('web', '')
+        self.live: str = kwargs.pop('live', '')
 
     def safe_repr(self, _level=0):
         """Like pretty_repr but hides passwords"""
@@ -213,6 +213,20 @@ class PostgresConfig(BaseConfig):
                 safe_v = f'{v[:span[0]]}<password>{v[span[1]:]}'
                 attrs.append(f'{" " * _level * 2}{name}: {str(safe_v)}')
         return "\n".join(attrs)
+
+    @staticmethod
+    def kwargs_from_env():
+        env_map = {
+            "main": os.getenv("MAIN_DSN"),
+            "web": os.getenv("WEB_DSN"),
+            "public": os.getenv("PUBLIC_DSN"),
+            "live": os.getenv("LIVE_DSN"),
+        }
+        return {k: v for k, v in env_map.items() if v is not None}
+
+    @classmethod
+    def from_env(cls):
+        return cls(**cls.kwargs_from_env())
 
 
 class PathsConfig(BaseConfig):
@@ -245,12 +259,20 @@ class PathsConfig(BaseConfig):
         elif not os.access(p, os.W_OK | os.R_OK):
             raise RuntimeError(f'Insufficient permissions for {p}')
 
+    @staticmethod
+    def kwargs_from_env():
+        env_map = {
+            "data": os.getenv("DATA_PATH"),
+            "upload": os.getenv("UPLOAD_PATH"),
+        }
+        return {k: v for k, v in env_map.items() if v is not None}
+
 
 class ChannelsConfig(BaseConfig):
     def __init__(self, **kwargs):
-        self.exceptions: int = kwargs.pop('exceptions', None)
-        self.default_voice: int = kwargs.pop('default_voice', None)
-        self.test: int = kwargs.pop('test', None)
+        self.exceptions: Optional[int] = kwargs.pop('exceptions', None)
+        self.default_voice: Optional[int] = kwargs.pop('default_voice', None)
+        self.test: Optional[int] = kwargs.pop('test', None)
 
 
 class BotConfig(BaseConfig):
@@ -304,18 +326,19 @@ class BotConfig(BaseConfig):
                 attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
         return "\n".join(attrs)
 
-    @classmethod
-    def from_dict(cls, data: dict):
-        """Read all from single dict"""
-        kwargs = dict(psql=PostgresConfig(), api_keys={}, approved_guilds=[], guilds={})
+    @staticmethod
+    def kwargs_from_dict(data: dict):
+        """Construct kwargs for self from dict"""
+        psql_kwargs = {}
+        kwargs = dict(api_keys={}, approved_guilds=[], guilds={})
         _paths = dict()
         _channels = dict()
         for d in data.get('configs', []):
             if v := d.get('token'):
                 kwargs['token'] = v
-            if v := d.get('psql'):
-                for name, dsn in v.items():
-                    setattr(kwargs['psql'], name, dsn)
+            for name, dsn in d.get('psql', {}).items():
+                if dsn:
+                    psql_kwargs[name] = dsn
             for name, val in d.get('api-keys', {}).items():
                 kwargs['api_keys'][name] = val
             if v := d.get('approved_guilds'):
@@ -333,8 +356,15 @@ class BotConfig(BaseConfig):
             g = GuildDef.from_dict(d)
             kwargs['guilds'][g.id] = g
 
+        kwargs['psql'] = PostgresConfig(**psql_kwargs)
         kwargs['paths'] = PathsConfig(**_paths)
         kwargs['channels'] = ChannelsConfig(**_channels)
+        return kwargs
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Read all from single dict"""
+        kwargs = cls.kwargs_from_dict(data)
 
         if not kwargs.get('token'):
             raise RuntimeError('Token not found in config')
@@ -394,3 +424,46 @@ class BotConfig(BaseConfig):
             all_dict['guilds'].append(data)
 
         return cls.from_dict(all_dict)
+
+    @classmethod
+    async def from_env_psql(cls, psql_configs: List[str] = None):
+        """Load config from env and PSQL, env vars override PG vars"""
+        psql_kwargs = PostgresConfig.kwargs_from_env()
+        if "main" not in psql_kwargs:
+            raise RuntimeError("MAIN_DSN is required")
+
+        loaded_configs = set()
+        configs = []
+        guilds = []
+        async with pg_connection(dsn=psql_kwargs["main"]) as con:
+            all_rows = await con.fetch(f'SELECT * FROM {cls.psql_table_name}')
+        for row in all_rows:
+            if row['type'] == 'guild':
+                guilds.append(json.loads(row['data']))
+            if row['type'] == 'config' and row['name'] in psql_configs:
+                configs.append(json.loads(row['data']))
+                loaded_configs.add(row['name'])
+
+        missing_rows = [name for name in psql_configs if name not in loaded_configs]
+        fail_missing_rows = bool(os.getenv('FAIL_MISSING_ROWS', 1))
+        if missing_rows and fail_missing_rows:
+            raise RuntimeError(f'Requested config row {", ".join(missing_rows)} not found in table `{cls.psql_table_name}`')
+
+        env_config = {
+            "api-keys": {},
+            "psql": psql_kwargs,
+            "paths": PathsConfig.kwargs_from_env(),
+        }
+        if v := os.getenv("BRAINS_PATH"):
+            env_config["brains"] = v
+        if v := os.getenv("TOKEN"):
+            env_config["token"] = v
+        if v := os.getenv("MRBOT_HOSTNAME"):
+            env_config["hostname"] = v
+        if v := os.getenv("GOOGLE_API_KEY"):
+            env_config["api-keys"]["google"] = v
+        if v := os.getenv("WOLFRAM_API_KEY"):
+            env_config["api-keys"]["wolfram"] = v
+        # Construct config dict for use with cls.from_dict()
+        configs.append(env_config)
+        return cls.from_dict({"configs": configs, "guilds": guilds})
