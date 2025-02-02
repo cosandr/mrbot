@@ -225,6 +225,8 @@ async def test_from_psql(mocker: pytest_mock.MockFixture):
     assert config.http.host == expected_config.http.host
     assert config.http.port == expected_config.http.port
 
+    assert config.kube is None
+
 
 @pytest.mark.asyncio
 async def test_from_env_psql_override(mocker: pytest_mock.MockFixture):
@@ -341,6 +343,8 @@ async def test_from_env_psql_override(mocker: pytest_mock.MockFixture):
     assert config.http.host == expected_config.http.host
     assert config.http.port == expected_config.http.port
 
+    assert config.kube is None
+
 
 @pytest.mark.asyncio
 async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
@@ -357,6 +361,10 @@ async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
         "BRAINS_PATH": "http://env_brains:7762",
         "HTTP_SERVER_HOST": "0.0.0.0",
         "HTTP_SERVER_PORT": "8888",
+        "POD_NAMESPACE": "env_namespace",
+        "POD_SELECTOR": "env_selector",
+        "BUSY_LABEL_KEY": "env_label_key",
+        "BUSY_LABEL_VALUE": "env_label_value",
     }
     for k, v in set_env.items():
         os.environ[k] = v
@@ -415,6 +423,12 @@ async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
             test=453141750106882033,
         ),
         http=HttpConfig(host="0.0.0.0", port=8888),
+        kube=KubeConfig(
+            namespace="env_namespace",
+            selector="env_selector",
+            label_key="env_label_key",
+            label_value="env_label_value",
+        ),
     )
     assert config.token == expected_config.token
 
@@ -435,3 +449,8 @@ async def test_from_env_psql_simple(mocker: pytest_mock.MockFixture):
 
     assert config.http.host == expected_config.http.host
     assert config.http.port == expected_config.http.port
+
+    assert config.kube.namespace == expected_config.kube.namespace
+    assert config.kube.selector == expected_config.kube.selector
+    assert config.kube.label_key == expected_config.kube.label_key
+    assert config.kube.label_value == expected_config.kube.label_value

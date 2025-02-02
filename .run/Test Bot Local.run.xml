@@ -23,7 +23,7 @@
       </ENTRIES>
     </EXTENSION>
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/launcher.py" />
-    <option name="PARAMETERS" value="--command-prefix ' --log-file bot-test.log --debug --busy-file ./busy psql-config -f config/.dsn_test -e test -e local" />
+    <option name="PARAMETERS" value="--command-prefix ' --log-file bot-test.log --debug psql-config -f config/.dsn_test -e test -e local" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

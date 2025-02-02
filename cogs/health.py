@@ -31,6 +31,17 @@ class HealthCheck(commands.Cog, name="HealthCheck"):
 
     async def cog_load(self):
         await self.bot.wait_until_ready()
+
+        if self.bot.config.kube is not None:
+            from kubernetes_asyncio import config
+
+            try:
+                config.load_incluster_config()
+                self.logger.debug("Kubernetes API initialized from cluster config")
+            except config.config_exception.ConfigException:
+                await config.load_kube_config()
+                self.logger.debug("Kubernetes API initialized from kubeconfig")
+
         await self.runner.setup()
         site = web.TCPSite(
             self.runner, self.bot.config.http.host, self.bot.config.http.port
@@ -48,6 +59,7 @@ class HealthCheck(commands.Cog, name="HealthCheck"):
             status = 500
             body["status"] = "BOT_NOT_READY"
             body["error"] = "Bot is not ready and/or connection is closed"
+
         # Run simple query
         try:
             async with self.bot.pool.acquire() as con:
@@ -56,6 +68,20 @@ class HealthCheck(commands.Cog, name="HealthCheck"):
             status = 500
             body["status"] = "POSTGRES_ERR"
             body["error"] = f"Postgres failure: {str(e)}"
+
+        # Check Kubernetes API
+        if self.bot.config.kube is not None:
+            from kubernetes_asyncio import client
+            from kubernetes_asyncio.client.api_client import ApiClient
+
+            async with ApiClient() as api:
+                core = client.CoreApi(api)
+                try:
+                    await core.get_api_versions()
+                except Exception as e:
+                    status = 500
+                    body["status"] = "KUBE_ERR"
+                    body["error"] = f"Kubernetes failure: {str(e)}"
 
         return web.Response(
             content_type="application/json", status=status, body=json.dumps(body)

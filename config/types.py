@@ -39,7 +39,7 @@ class BaseConfig:
             # Always show booleans, but ignore empty lists, dicts, None etc
             if isinstance(v, bool) or v:
                 if func := getattr(v, "pretty_repr", None):
-                    attrs.append(f'{" " * _level * 2}{name}:\n{func(_level+1)}')
+                    attrs.append(f'{" " * _level * 2}{name}:\n{func(_level + 1)}')
                 else:
                     attrs.append(f'{" " * _level * 2}{name}: {str(v)}')
         return "\n".join(attrs)
@@ -47,6 +47,7 @@ class BaseConfig:
 
 class DefaultPermissions:
     """Some default PermissionOverwrite's"""
+
     @staticmethod
     def read_write():
         """Permission allowing reading and writing messages"""
@@ -87,6 +88,7 @@ class DefaultPermissions:
 
 class RoleDef(BaseConfig):
     """Role definition for guild.json"""
+
     def __init__(self, name, **kwargs):
         self.name: str = name
         self.permission_overwrite = discord.PermissionOverwrite(**kwargs)
@@ -112,6 +114,7 @@ class RoleDef(BaseConfig):
 
 class MemberDef(BaseConfig):
     """Member definition for guild.json"""
+
     def __init__(self, id_, name, self_role=False, roles=None):
         self.id: int = id_
         self.name: str = name
@@ -124,6 +127,7 @@ class MemberDef(BaseConfig):
 
 class TextChannelDef(BaseConfig):
     """Text channel definition for guild.json"""
+
     def __init__(self, name, roles=None, member_names=None, member_ids=None, read_only=False):
         self.name: str = name
         self.roles: List[str] = roles
@@ -141,6 +145,7 @@ class TextChannelDef(BaseConfig):
 
 class GuildDef(BaseConfig):
     """Overall definition for guild.json"""
+
     def __init__(self, id_, name='', members=None, text_channels=None, roles=None):
         self.id: int = id_
         self.name: str = name
@@ -289,6 +294,24 @@ class HttpConfig(BaseConfig):
         return {k: v for k, v in env_map.items() if v is not None}
 
 
+class KubeConfig(BaseConfig):
+    def __init__(self, **kwargs):
+        self.namespace: str = kwargs.pop('namespace')
+        self.selector: Optional[str] = kwargs.pop('selector', "app.kubernetes.io/instance=mrbot")
+        self.label_key: Optional[str] = kwargs.pop('label_key', "is-busy")
+        self.label_value: Optional[str] = kwargs.pop('label_value', "true")
+
+    @staticmethod
+    def kwargs_from_env():
+        env_map = {
+            "namespace": os.getenv("POD_NAMESPACE"),
+            "selector": os.getenv("POD_SELECTOR"),
+            "label_key": os.getenv("BUSY_LABEL_KEY"),
+            "label_value": os.getenv("BUSY_LABEL_VALUE"),
+        }
+        return {k: v for k, v in env_map.items() if v is not None}
+
+
 class BotConfig(BaseConfig):
     """Global bot config, will not start without most of it"""
     psql_table_name = 'bot_config'
@@ -303,7 +326,8 @@ class BotConfig(BaseConfig):
     psql_all_tables = {(psql_table_name,): psql_table}
 
     def __init__(self, token, psql, api_keys=None, approved_guilds=None, brains='',
-                 guilds=None, hostname='', paths=None, channels=None, http=None):
+                 guilds=None, hostname='', paths=None, channels=None, http=None,
+                 kube=None):
         self.token: str = token
         self.psql: PostgresConfig = psql
         self.api_keys: dict = api_keys or dict()
@@ -314,6 +338,7 @@ class BotConfig(BaseConfig):
         self.paths: PathsConfig = paths
         self.channels: ChannelsConfig = channels
         self.http: HttpConfig = http
+        self.kube: Optional[KubeConfig] = kube
 
     def safe_repr(self, _level=0):
         """Like pretty_repr but shorter and hides sensitive information (token, API keys)"""
@@ -325,7 +350,7 @@ class BotConfig(BaseConfig):
             if name[0] == '_':
                 name = name[1:]
             if func := getattr(v, "safe_repr", None) or getattr(v, "pretty_repr", None):
-                attrs.append(f'{" " * _level * 2}{name}:\n{func(_level+1)}')
+                attrs.append(f'{" " * _level * 2}{name}:\n{func(_level + 1)}')
             elif name == 'token':
                 attrs.append(f'{" " * _level * 2}{name}: {v[:3]}...{v[-3:]}')
             elif name == 'api_keys':
@@ -349,6 +374,7 @@ class BotConfig(BaseConfig):
         _paths = dict()
         _channels = dict()
         _http = dict()
+        _kube = dict()
         for d in data.get('configs', []):
             if v := d.get('token'):
                 kwargs['token'] = v
@@ -369,6 +395,8 @@ class BotConfig(BaseConfig):
                 _channels[name] = val
             for name, val in d.get('http', {}).items():
                 _http[name] = val
+            for name, val in d.get('kube', {}).items():
+                _kube[name] = val
 
         for d in data.get('guilds', []):
             g = GuildDef.from_dict(d)
@@ -378,6 +406,9 @@ class BotConfig(BaseConfig):
         kwargs['paths'] = PathsConfig(**_paths)
         kwargs['channels'] = ChannelsConfig(**_channels)
         kwargs['http'] = HttpConfig(**_http)
+        if _kube:
+            kwargs['kube'] = KubeConfig(**_kube)
+
         return kwargs
 
     @classmethod
@@ -484,6 +515,8 @@ class BotConfig(BaseConfig):
             env_config["api-keys"]["google"] = v
         if v := os.getenv("WOLFRAM_API_KEY"):
             env_config["api-keys"]["wolfram"] = v
+        if os.getenv("POD_NAMESPACE"):
+            env_config["kube"] = KubeConfig.kwargs_from_env()
         # Construct config dict for use with cls.from_dict()
         configs.append(env_config)
         return cls.from_dict({"configs": configs, "guilds": guilds})

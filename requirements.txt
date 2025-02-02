@@ -12,5 +12,7 @@ scipy>=1.8,<2.0
 matplotlib>=3.5,<4.0
 dateparser>=1.1,<2.0
 pytimeparse>=1.1,<2.0
+# Ideally kept in sync with cluster version, currently 1.31
+kubernetes-asyncio>=31,<32
 # Always use latest youtube-dl
 youtube_dl>=2021.12.17

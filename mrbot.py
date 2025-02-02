@@ -76,7 +76,8 @@ class MrBot(commands.Bot):
         self._re_prefix_check = re.compile(f'^({group}).*')
         self._running_commands = 0
         self._busy_wake = asyncio.Event()
-        self._busy_task = None
+        self._busy_file_task = None
+        self._busy_kube_task = None
 
     async def start(self, *args, **kwargs):
         await super().start(self.config.token, *args, **kwargs)
@@ -87,20 +88,25 @@ class MrBot(commands.Bot):
 
     def _handler_reload(self) -> None:
         """Reload cogs on SIGHUP"""
+
         async def __reload():
             await self.unload_all_extensions()
             await self.load_all_extensions()
+
         asyncio.create_task(__reload())
 
     async def setup_hook(self) -> None:
         """Connects to postgres `discord` database using a pool and aiohttp"""
-        # Can only access bot.loop in async context 
+        # Can only access bot.loop in async context
         if platform.system() != 'Windows':
             self.loop.add_signal_handler(signal.SIGTERM, self._handler_close)
             self.loop.add_signal_handler(signal.SIGHUP, self._handler_reload)
 
         if self.busy_file:
-            self._busy_task = asyncio.create_task(self.busy_file_worker())
+            self._busy_file_task = asyncio.create_task(self.busy_file_worker())
+
+        if self.config.kube is not None:
+            self._busy_kube_task = asyncio.create_task(self.busy_kube_worker())
 
         self.sess_ready.clear()
         self.pool = await asyncpg.create_pool(dsn=self.config.psql.main, init=asyncpg_con_init)
@@ -127,9 +133,11 @@ class MrBot(commands.Bot):
         if self._close_ran:
             return
         self._close_ran = True
-        self.logger.info(f"{'-'*10} Cleanup start {'-'*10}")
-        if self._busy_task:
-            self._busy_task.cancel()
+        self.logger.info(f"{'-' * 10} Cleanup start {'-' * 10}")
+        if self._busy_file_task:
+            self._busy_file_task.cancel()
+        if self._busy_kube_task:
+            self._busy_kube_task.cancel()
         self.logger.info('--- Unloading cogs')
         await self.unload_all_extensions()
         for task in self.cleanup_tasks:
@@ -143,7 +151,7 @@ class MrBot(commands.Bot):
             await self.unix_sess.close()
         self.logger.info('--- Closing PSQL pool')
         await asyncio.wait_for(self.pool.close(), 3)
-        self.logger.info(f"{'-'*10} Cleanup done {'-'*11}\n")
+        self.logger.info(f"{'-' * 10} Cleanup done {'-' * 11}\n")
         await super().close()
 
     async def busy_file_worker(self):
@@ -151,6 +159,7 @@ class MrBot(commands.Bot):
             if os.path.exists(self.busy_file):
                 os.unlink(self.busy_file)
                 self.logger.debug("Busy file %s removed", self.busy_file)
+
         try:
             while True:
                 await self._busy_wake.wait()
@@ -167,6 +176,93 @@ class MrBot(commands.Bot):
             return
         finally:
             _delete_file()
+
+    async def busy_kube_worker(self):
+        from kubernetes_asyncio import client, config
+        from kubernetes_asyncio.client.api_client import ApiClient
+
+        try:
+            config.load_incluster_config()
+            self.logger.debug("Kubernetes API initialized from cluster config")
+        except config.config_exception.ConfigException:
+            await config.load_kube_config()
+            self.logger.debug("Kubernetes API initialized from kubeconfig")
+
+        add_patch = [
+            {
+                "op": "add",
+                "path": f"/metadata/labels/{self.config.kube.label_key}",
+                "value": self.config.kube.label_value,
+            }
+        ]
+
+        remove_patch = [
+            {
+                "op": "remove",
+                "path": f"/metadata/labels/{self.config.kube.label_key}",
+            }
+        ]
+
+        async with ApiClient() as api:
+            v1 = client.CoreV1Api(api)
+
+            async def add_label(pod_name: str):
+                try:
+                    await v1.patch_namespaced_pod(name=pod_name, namespace=self.config.kube.namespace, body=add_patch)
+                    self.logger.debug("Label '%s=%s' added to pod %s", self.config.kube.label_key, self.config.kube.label_value, pod_name)
+                except client.exceptions.ApiException as e:
+                    self.logger.error("Error adding label to pod %s: %s", pod_name, str(e))
+
+            async def remove_label(pod_name: str):
+                try:
+                    await v1.patch_namespaced_pod(name=pod_name, namespace=self.config.kube.namespace, body=remove_patch)
+                    self.logger.debug("Label '%s' removed from pod %s", self.config.kube.label_key, pod_name)
+                except client.exceptions.ApiException as e:
+                    if e.status == 422:
+                        self.logger.debug("Label '%s' does not exist on pod %s", self.config.kube.label_key, pod_name)
+                    else:
+                        self.logger.error("Error removing label from pod %s: %s", pod_name, str(e))
+            # Fetch at startup in case we exit before the first busy event
+            pods = await v1.list_namespaced_pod(self.config.kube.namespace, label_selector=self.config.kube.selector)
+            self.logger.debug("Fetched %d pods in %s namespace", len(pods.items), self.config.kube.namespace)
+            try:
+                while True:
+                    try:
+                        await self._busy_wake.wait()
+                        # NOTE: Could consider fetching only once on startup
+                        pods = await v1.list_namespaced_pod(self.config.kube.namespace, label_selector=self.config.kube.selector)
+                        self.logger.debug("Fetched %d pods in %s namespace", len(pods.items), self.config.kube.namespace)
+                        add_label_pods = []
+                        remove_label_pods = []
+                        # Find pods needing label to be set
+                        for pod in pods.items:
+                            if getattr(pod.metadata, "labels", {}).get(self.config.kube.label_key) != self.config.kube.label_value:
+                                add_label_pods.append(pod.metadata.name)
+                            elif self.config.kube.label_key in getattr(pod.metadata, "labels", {}):
+                                remove_label_pods.append(pod.metadata.name)
+                        # Wait 5 seconds before patching pods
+                        await asyncio.sleep(5)
+                        if self._running_commands > 0 and add_label_pods:
+                            # self.logger.debug("Adding label to %d pods in %s namespace", len(add_label_pods), self.config.kube.namespace)
+                            for pod in add_label_pods:
+                                await add_label(pod)
+                        elif self._running_commands <= 0:
+                            # self.logger.debug("Removing label from %d pods in %s namespace", len(remove_label_pods), self.config.kube.namespace)
+                            for pod in remove_label_pods:
+                                await remove_label(pod)
+                            self._running_commands = 0
+                        self._busy_wake.clear()
+                    except asyncio.CancelledError:
+                        return
+                    except Exception as e:
+                        self.logger.error("Failed to update labels: %s", str(e))
+                        # Clear to prevent infinite loop
+                        self._busy_wake.clear()
+            finally:
+                # Unconditionally remove when exiting
+                self.logger.debug("Cleaning up labels from %d pods in %s namespace", len(pods.items), self.config.kube.namespace)
+                for pod in pods.items:
+                    await remove_label(pod.metadata.name)
 
     async def on_message(self, message: discord.Message) -> None:
         # Don't respond to bots
