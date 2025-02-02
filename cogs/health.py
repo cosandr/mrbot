@@ -51,14 +51,14 @@ class HealthCheck(commands.Cog, name="HealthCheck"):
     async def cog_unload(self):
         await self.runner.cleanup()
 
-    async def health(self, r: web.Request) -> web.Response:
-        self.logger.debug(r.path)
+    async def health(self, _r: web.Request) -> web.Response:
         status = 200
         body = {"status": "OK"}
         if not self.bot.is_ready() or self.bot.is_closed():
             status = 500
             body["status"] = "BOT_NOT_READY"
             body["error"] = "Bot is not ready and/or connection is closed"
+            self.logger.error("Bot ready health check failed")
 
         # Run simple query
         try:
@@ -68,6 +68,7 @@ class HealthCheck(commands.Cog, name="HealthCheck"):
             status = 500
             body["status"] = "POSTGRES_ERR"
             body["error"] = f"Postgres failure: {str(e)}"
+            self.logger.exception("Postgres health check failed")
 
         # Check Kubernetes API
         if self.bot.config.kube is not None:
@@ -82,6 +83,7 @@ class HealthCheck(commands.Cog, name="HealthCheck"):
                     status = 500
                     body["status"] = "KUBE_ERR"
                     body["error"] = f"Kubernetes failure: {str(e)}"
+                    self.logger.exception("Kubernetes API health check failed")
 
         return web.Response(
             content_type="application/json", status=status, body=json.dumps(body)
