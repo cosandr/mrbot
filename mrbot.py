@@ -1,4 +1,5 @@
 import asyncio
+import importlib.metadata
 import json
 import logging
 import os
@@ -14,10 +15,9 @@ import asyncpg
 import discord
 from aiohttp import ClientSession, UnixConnector
 from discord.ext import commands
-from pkg_resources import get_distribution
 
 import config as cfg
-from ext.brains import Response, BrainsAPIError
+from ext.brains import BrainsAPIError, Response
 from ext.context import Context
 from ext.embed_helpers import embed_local_file
 from ext.errors import MissingConfigError
@@ -127,7 +127,7 @@ class MrBot(commands.Bot):
 
     async def on_ready(self) -> None:
         self.logger.info((f"Logged in as {self.user.name} [{self.user.id}], "
-                          f"d.py version {get_distribution('discord.py').version}"))
+                          f"d.py version {importlib.metadata.version('discord.py')}"))
 
     async def close(self) -> None:
         if self._close_ran:

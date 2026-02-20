@@ -12,9 +12,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt /tmp/req.txt
 
-# https://github.com/pypa/setuptools/blob/main/NEWS.rst#deprecations-and-removals
 RUN python -m venv /opt/venv && \
-    pip install -U pip wheel 'setuptools<81' && \
+    pip install -U pip wheel setuptools && \
     echo 'pip: install deps' && \
     pip install ${PIP_ARGS} -r /tmp/req.txt
 
