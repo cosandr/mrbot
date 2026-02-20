@@ -1,5 +1,5 @@
-discord.py[voice]>=2.3,<2.4
-emoji>=2.8,<2.9
+discord.py[voice]>=2.6,<2.7
+emoji>=2.15,<2.16
 jellyfish>=1.0,<1.1
 numpy>=1.22,<2.0
 Pillow>=10.3,<10.4
@@ -12,7 +12,7 @@ scipy>=1.8,<2.0
 matplotlib>=3.5,<4.0
 dateparser>=1.1,<2.0
 pytimeparse>=1.1,<2.0
-# Ideally kept in sync with cluster version, currently 1.31
-kubernetes-asyncio>=31,<32
+# Ideally kept in sync with cluster version, currently 1.34
+kubernetes-asyncio>=34,<35
 # Always use latest youtube-dl
 youtube_dl>=2021.12.17
