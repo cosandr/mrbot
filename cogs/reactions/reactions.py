@@ -304,6 +304,9 @@ class Reactions(commands.Cog, name="Reaction"):
         # Ignore blacklisted channels
         if message.channel.id in self.config.on_message_ignore_channels:
             return
+        # If this is a thread, ignore if parent (channel) is ignored as well
+        if isinstance(message.channel, discord.Thread) and message.channel.parent_id in self.config.on_message_ignore_channels:
+            return
         # Pitch Meeting
         if self.re_super_easy.search(message.content):
             asyncio.create_task(self._send_super_easy(message))
