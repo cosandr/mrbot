@@ -34,7 +34,7 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     echo '**** apt: install deps ****' && \
     DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends install \
-        sudo locales texlive dvipng libffi-dev libnacl-dev libopus-dev ffmpeg && \
+        curl sudo locales texlive dvipng libffi-dev libnacl-dev libopus-dev ffmpeg && \
     echo '**** S6: Install ****' && \
     tar xzf /tmp/s6-overlay-amd64.tar.gz -C / && \
     echo '**** user: Create abc user and group ****' && \
